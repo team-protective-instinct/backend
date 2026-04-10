@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     DB_PORT: int = Field(default=3306)
     DB_NAME: str = Field(default=...)
 
+    GOOGLE_API_KEY: str = Field(default=...)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
