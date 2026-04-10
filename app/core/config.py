@@ -1,11 +1,6 @@
-import os
 import urllib.parse
-from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-# 현재 config.py 파일의 부모의 부모 디렉터리(즉, 프로젝트 루트)를 찾습니다.
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -16,7 +11,7 @@ class Settings(BaseSettings):
     DB_NAME: str = Field(default=...)
 
     model_config = SettingsConfigDict(
-        env_file=os.path.join(BASE_DIR, ".env"),  # .env 파일의 경로를 지정
+        env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",  # .env에 클래스에 없는 변수가 있어도 무시
     )
