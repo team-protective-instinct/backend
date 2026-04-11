@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     def db_url(self) -> str:
         # 패스워드를 URL 안전하게 인코딩합니다.
         # 예: 'p@ssword' -> 'p%40ssword'
-        encoded_password = urllib.parse.quote_plus(self.DB_PASSWORD)
-        return f"mysql+pymysql://{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        pwd = urllib.parse.quote_plus(self.DB_PASSWORD)
+        return f"postgresql://{self.DB_USER}:{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
 settings = Settings()
