@@ -44,8 +44,17 @@ cp .env.example .env
 ```
 생성된 `.env` 파일을 열고, 팀 내 공유된 데이터베이스 정보 및 설정값을 입력합니다.
 
-### 5. 로컬 서버 실행
-모든 준비가 완료되었다면 서버를 실행합니다. `uv run` 명령어로 가상환경 내의 `uvicorn`을 바로 실행할 수 있습니다.
+### 5. 데이터베이스(PostgreSQL) 실행
+프로젝트는 로컬 환경에서 **Docker Compose**를 이용해 PostgreSQL 및 `pgvector`를 실행합니다. 원활한 실행을 위해 PC에 [Docker Desktop](https://www.docker.com/products/docker-desktop/) 또는 Docker가 설치되어 있어야 합니다.
+
+백그라운드에서 데이터베이스 컨테이너를 실행하려면 다음 명령어를 입력합니다:
+```bash
+docker compose up -d
+```
+> 💡 컨테이너를 중지하려면 `docker compose down`을 사용합니다. 볼륨 마운트 처리가 되어 있으므로 컨테이너를 중지 및 재생성해도 로컬 DB 데이터는 보존됩니다.
+
+### 6. 로컬 서버 실행
+동작 중인 데이터베이스를 포함해 모든 준비가 완료되었다면 서버를 실행합니다. `uv run` 명령어로 가상환경 내의 `uvicorn`을 바로 실행할 수 있습니다.
 
 ```bash
 uv run uvicorn app.main:app --reload
