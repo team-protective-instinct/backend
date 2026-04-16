@@ -17,3 +17,7 @@ class User(UserBase):
 
     class Config:
         from_attributes = True  # SQLAlchemy 객체를 Pydantic으로 변환 허용
+
+
+class UserSignIn(UserBase):
+    password: str

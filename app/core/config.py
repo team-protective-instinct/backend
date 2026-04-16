@@ -12,14 +12,14 @@ class Settings(BaseSettings):
 
     GOOGLE_API_KEY: str = Field(default=...)
 
+    SECRET_KEY: str = Field(default=...)
+    ALGORITHM: str = Field(default="HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore",  # .env에 클래스에 없는 변수가 있어도 무시
     )
-
-    # .env 파일을 읽어오기 위한 설정
-    model_config = SettingsConfigDict(env_file=".env")
 
     @property
     def db_url(self) -> str:
