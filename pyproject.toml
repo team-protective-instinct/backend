@@ -15,6 +15,10 @@ dependencies = [
   "psycopg2-binary>=2.9.11",
   "pyjwt>=2.12.1",
   "bcrypt==4.3.0",
+  "langgraph-checkpoint-postgres>=3.0.5",
+  "psycopg>=3.3.3",
+  "psycopg-pool>=3.3.0",
+  "psycopg-binary>=3.3.3",
 ]
 [tool.pyright]
 venvPath = "."
