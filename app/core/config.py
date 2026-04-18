@@ -10,7 +10,12 @@ class Settings(BaseSettings):
     DB_PORT: int = Field(default=3306)
     DB_NAME: str = Field(default=...)
 
-    GOOGLE_API_KEY: str = Field(default=...)
+    # LLM Settings
+    LLM_PROVIDER: str = Field(default="gemini") # "gemini", "anthropic", "openai"
+    LLM_MODEL: str = Field(default="gemini-3.1-pro") 
+    GOOGLE_API_KEY: str | None = Field(default=None)
+    ANTHROPIC_API_KEY: str | None = Field(default=None)
+    OPENAI_API_KEY: str | None = Field(default=None)
 
     SECRET_KEY: str = Field(default=...)
     ALGORITHM: str = Field(default="HS256")
