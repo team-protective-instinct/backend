@@ -14,3 +14,11 @@ VERDICT_SYSTEM_PROMPT = """Provide a final security verdict based on the analysi
 4. Provide the final classification (is_true_positive) and a concise summary reasoning (executive_summary) in 3 sentences or less."""
 
 INCIDENT_REPORT_SYSTEM_PROMPT = """You are a Senior Cyber Security Analyst. Based on the previous analysis (key_indicators) and verdict (executive_summary), generate a structured 'IncidentReport' that provides actionable insights for management and security response teams."""
+
+# Nudges and status messages for LLM nodes
+FINALIZE_VERDICT_NUDGE = "Based on the analysis above, please provide the final verdict in the required structured format."
+GENERATE_REPORT_NUDGE = "Please summarize the verdict and analysis to generate the final incident report."
+
+# Prefixes for structured data passing
+ANALYSIS_RESULT_PREFIX = "Final analysis results: "
+LOG_ANALYSIS_REQUEST_PREFIX = "Please analyze the following logs to determine if they are a threat:\n"
