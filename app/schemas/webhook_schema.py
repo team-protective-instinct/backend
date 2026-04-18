@@ -1,5 +1,5 @@
-from typing import Optional
-from pydantic import BaseModel, Field
+from typing import Any, Optional, cast
+from pydantic import BaseModel, Field, ConfigDict
 from app.schemas.agent_schema import FinalSecurityAnalysis, IncidentReport
 
 
@@ -103,14 +103,14 @@ class WebhookAlertRequest(BaseModel):
         min_length=1,
     )
 
-    model_config = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {
                     "alert_name": "sql_injection_detected",
                     "severity": "high",
-                    "logs": _DUMMY_LOGS,
+                    "logs": cast(Any, _DUMMY_LOGS),
                 }
             ]
         }
-    }
+    )

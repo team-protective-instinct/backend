@@ -20,8 +20,8 @@ def create_incident_from_analysis(
     db: Session,
     title: str,
     raw_log: str,
-    verdict_data: dict,
-    report_data: dict,
+    verdict_data: dict | None,
+    report_data: dict | None,
     is_threat: bool,
     thread_id: str,
 ) -> Incident:

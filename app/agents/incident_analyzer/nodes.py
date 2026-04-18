@@ -1,4 +1,5 @@
 import json
+from typing import cast
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, merge_message_runs
 from .prompt import (
     INCIDENT_REPORT_SYSTEM_PROMPT,
@@ -47,7 +48,7 @@ def finalize_verdict(state: AgentState):
     nudge_msg = HumanMessage(content=FINALIZE_VERDICT_NUDGE)
     
     messages = merge_message_runs([verdict_prompt] + state["messages"] + [nudge_msg])
-    verdict: FinalSecurityAnalysis = llm_verdict.invoke(messages)
+    verdict = cast(FinalSecurityAnalysis, llm_verdict.invoke(messages))
 
     print("\n[AI Analysis Result JSON]")
     print(json.dumps(verdict.model_dump(), ensure_ascii=False, indent=2))
@@ -68,8 +69,12 @@ def generate_incident_report(state: AgentState):
     report_prompt = SystemMessage(content=INCIDENT_REPORT_SYSTEM_PROMPT)
 
     # Include the verdict as a text message
+    final_analysis = state.get("final_analysis")
+    if not final_analysis:
+        raise ValueError("final_analysis is missing in AgentState")
+
     analysis_result_msg = HumanMessage(
-        content=f"{ANALYSIS_RESULT_PREFIX}{json.dumps(state['final_analysis'].model_dump(), ensure_ascii=False)}"
+        content=f"{ANALYSIS_RESULT_PREFIX}{json.dumps(final_analysis.model_dump(), ensure_ascii=False)}"
     )
     
     # Nudge the LLM to write the report
@@ -91,6 +96,6 @@ def should_continue(state: AgentState):
     Determine the next node based on presence of tool calls.
     """
     last_message = state["messages"][-1]
-    if last_message.tool_calls:
+    if isinstance(last_message, AIMessage) and last_message.tool_calls:
         return "tools"
     return "finalize"

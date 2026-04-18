@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, BackgroundTasks
-from app.agents import run_threat_analysis
+from app.services.incident_service import incident_analysis
 from app.schemas import (
     LogEntry,
     WebhookAlertRequest,
@@ -39,7 +39,7 @@ def _run_analysis_background(alert_name: str, log_text: str):
     print("=" * 50)
 
     try:
-        run_threat_analysis(log_text)
+        incident_analysis(log_text)
         logger.info(f"백그라운드 분석 완료 - alert={alert_name}")
     except Exception:
         logger.exception(f"위협 분석 중 오류 발생 - alert={alert_name}")
