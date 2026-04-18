@@ -217,3 +217,7 @@ __marimo__/
 
 # PostgreSQL local data
 postgres_data/
+
+!normal_traffic_01.log
+!sql_injection_01.log
+!xss_attack_01.log

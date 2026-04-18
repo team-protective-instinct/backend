@@ -1,0 +1,7 @@
+[Access Log]
+Time: 2026-04-18 11:05:12
+IP: 45.33.22.11
+Method: POST
+URI: /guestbook/post
+Body: name=hacker&message=<script>alert(1)</script>
+User-Agent: curl/7.68.0
