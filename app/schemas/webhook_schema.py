@@ -1,6 +1,5 @@
-from typing import Any, Optional, cast
+from typing import Any, cast
 from pydantic import BaseModel, Field, ConfigDict
-from app.schemas.agent_schema import FinalSecurityAnalysis, IncidentReport
 
 
 class LogEntry(BaseModel):
