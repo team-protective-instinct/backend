@@ -10,6 +10,7 @@ from .prompt import (
     GENERATE_REPORT_NUDGE,
     ANALYSIS_RESULT_PREFIX,
 )
+from functools import lru_cache
 from .state import AgentState
 from .tools import analyze_payload, check_ip_reputation
 from app.core.llm import get_llm
@@ -35,13 +36,13 @@ def _get_llm_resources():
 def reason_and_act(state: AgentState):
     """
     Node for the LLM to decide the next action based on messages.
-    Merges consecutive messages for Anthropic API compliance.
     """
+    resources = _get_llm_resources()
     system_prompt = SystemMessage(content=THREAT_ANALYSIS_AGENT_SYSTEM_PROMPT)
 
     messages = merge_message_runs([system_prompt] + state["messages"])
     
-    response = llm_with_tools.invoke(messages)
+    response = resources["llm_with_tools"].invoke(messages)
     return {"messages": [response]}
 
 
@@ -49,13 +50,14 @@ def finalize_verdict(state: AgentState):
     """
     Final security verdict node based on analysis and evidence.
     """
+    resources = _get_llm_resources()
     verdict_prompt = SystemMessage(content=VERDICT_SYSTEM_PROMPT)
 
     # Nudge the LLM to provide the final verdict
     nudge_msg = HumanMessage(content=FINALIZE_VERDICT_NUDGE)
     
     messages = merge_message_runs([verdict_prompt] + state["messages"] + [nudge_msg])
-    verdict = cast(FinalSecurityAnalysis, llm_verdict.invoke(messages))
+    verdict = cast(FinalSecurityAnalysis, resources["llm_verdict"].invoke(messages))
 
     logger.info("AI Analysis Result JSON:")
     logger.info(json.dumps(verdict.model_dump(), ensure_ascii=False, indent=2))
@@ -73,6 +75,7 @@ def generate_incident_report(state: AgentState):
     """
     Node to generate the final incident report based on the verdict.
     """
+    resources = _get_llm_resources()
     report_prompt = SystemMessage(content=INCIDENT_REPORT_SYSTEM_PROMPT)
 
     # Include the verdict as a text message
@@ -90,7 +93,7 @@ def generate_incident_report(state: AgentState):
     messages = merge_message_runs(
         [report_prompt] + state["messages"] + [analysis_result_msg] + [nudge_msg]
     )
-    report = llm_report.invoke(messages)
+    report = resources["llm_report"].invoke(messages)
 
     return {
         "incident_report": report,

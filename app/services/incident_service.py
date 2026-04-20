@@ -3,7 +3,7 @@ import logging
 import uuid
 from langchain_core.messages import HumanMessage
 from sqlalchemy.orm import Session
-from app.agents import AgentState, threat_agent_graph
+from app.agents import AgentState, get_threat_agent_graph
 from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.models import Incident
 from app.core.database import SessionLocal
@@ -66,10 +66,14 @@ def incident_analysis(log_text: str):
     """
     thread_id = str(uuid.uuid4())
 
+    # Factory 함수를 통해 그래프 인스턴스를 가져옵니다 (Lazy Loading)
+    threat_agent_graph = get_threat_agent_graph()
+
     initial_state: AgentState = {
         "messages": [HumanMessage(content=f"{LOG_ANALYSIS_REQUEST_PREFIX}{log_text}")],
-        "final_analysis": None,
-        "incident_report": None,
+        "final_analysis": None,  # type: ignore
+        "incident_report": None,  # type: ignore
+        "context": {"source": "log_analytics_service"},
     }
 
     logger.info(f"[Starting Threat Analysis - Thread ID: {thread_id}]")
