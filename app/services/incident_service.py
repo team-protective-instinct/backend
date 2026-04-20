@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from langchain_core.messages import HumanMessage
 from sqlalchemy.orm import Session
@@ -6,6 +7,8 @@ from app.agents import AgentState, threat_agent_graph
 from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.models import Incident
 from app.core.database import SessionLocal
+
+logger = logging.getLogger(__name__)
 
 
 def create_incident(db: Session, title: str, description: str):
@@ -69,7 +72,7 @@ def incident_analysis(log_text: str):
         "incident_report": None,
     }
 
-    print(f"[Starting Threat Analysis - Thread ID: {thread_id}]")
+    logger.info(f"[Starting Threat Analysis - Thread ID: {thread_id}]")
 
     # Use invoke to get the final state
     final_state = threat_agent_graph.invoke(
@@ -85,16 +88,16 @@ def incident_analysis(log_text: str):
         verdict_dict = analysis.model_dump()
         is_threat = analysis.is_true_positive
 
-        print("[Step 1: Final Verdict Completed]")
-        print(f" - Verdict: {'True Positive' if is_threat else 'False Positive'}")
-        print(f" - Confidence Score: {analysis.confidence_score}")
-        print(f" - Summary: {analysis.executive_summary}")
+        logger.info("[Step 1: Final Verdict Completed]")
+        logger.info(f" - Verdict: {'True Positive' if is_threat else 'False Positive'}")
+        logger.info(f" - Confidence Score: {analysis.confidence_score}")
+        logger.info(f" - Summary: {analysis.executive_summary}")
 
     if final_state.get("incident_report"):
         report = final_state["incident_report"]
         report_dict = report.model_dump()
-        print("[Step 2: Incident Report Generated]")
-        print(
+        logger.info("[Step 2: Incident Report Generated]")
+        logger.info(
             json.dumps(
                 report_dict,
                 ensure_ascii=False,
@@ -102,7 +105,7 @@ def incident_analysis(log_text: str):
             )
         )
 
-    print("Storing analysis results in the database...")
+    logger.info("Storing analysis results in the database...")
 
     db = SessionLocal()
     try:
@@ -115,9 +118,9 @@ def incident_analysis(log_text: str):
             is_threat=is_threat,
             thread_id=thread_id,
         )
-        print(f"DB Storage Completed (Thread ID: {thread_id})")
+        logger.info(f"DB Storage Completed (Thread ID: {thread_id})")
     except Exception as e:
-        print(f"DB Storage Error: {e}")
+        logger.error(f"DB Storage Error: {e}")
     finally:
         db.close()
 
