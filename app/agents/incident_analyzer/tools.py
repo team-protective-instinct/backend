@@ -1,10 +1,13 @@
+import logging
 from langchain_core.tools import tool
+
+logger = logging.getLogger(__name__)
 
 
 @tool
 def check_ip_reputation(ip_address: str) -> str:
     """Check the reputation and threat intelligence information of an IP address."""
-    print(f"  [Tool Execution] Checking IP reputation... ({ip_address})")
+    logger.info(f"[Tool Execution] Checking IP reputation... ({ip_address})")
 
     malicious_ips = ["103.22.1.5", "45.33.22.11"]
     internal_ips = ["192.168.1.100", "10.0.0.5"]
@@ -19,7 +22,7 @@ def check_ip_reputation(ip_address: str) -> str:
 @tool
 def analyze_payload(payload: str) -> str:
     """Analyze the HTTP request payload (URI, Body, etc.) to check for attack signatures."""
-    print(f"  [Tool Execution] Analyzing payload... ({payload})")
+    logger.info(f"[Tool Execution] Analyzing payload... ({payload})")
 
     payload_upper = payload.upper()
     if "UNION SELECT" in payload_upper or "OR 1=1" in payload_upper:

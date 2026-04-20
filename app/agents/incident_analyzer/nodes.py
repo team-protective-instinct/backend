@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import cast
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, merge_message_runs
 from .prompt import (
@@ -14,15 +15,21 @@ from .tools import analyze_payload, check_ip_reputation
 from app.core.llm import get_llm
 from app.schemas.agent_schema import FinalSecurityAnalysis, IncidentReport
 
-llm = get_llm(temperature=1.0)
+logger = logging.getLogger(__name__)
 
-# Binding for tools
-tools = [check_ip_reputation, analyze_payload]
-llm_with_tools = llm.bind_tools(tools)
-
-# Binding for structured output
-llm_verdict = llm.with_structured_output(FinalSecurityAnalysis)
-llm_report = llm.with_structured_output(IncidentReport)
+@lru_cache(maxsize=1)
+def _get_llm_resources():
+    """
+    Lazy loader for LLM instances to avoid overhead during module import.
+    """
+    llm = get_llm(temperature=1.0)
+    tools = [check_ip_reputation, analyze_payload]
+    
+    return {
+        "llm_with_tools": llm.bind_tools(tools),
+        "llm_verdict": llm.with_structured_output(FinalSecurityAnalysis),
+        "llm_report": llm.with_structured_output(IncidentReport),
+    }
 
 
 def reason_and_act(state: AgentState):
@@ -50,8 +57,8 @@ def finalize_verdict(state: AgentState):
     messages = merge_message_runs([verdict_prompt] + state["messages"] + [nudge_msg])
     verdict = cast(FinalSecurityAnalysis, llm_verdict.invoke(messages))
 
-    print("\n[AI Analysis Result JSON]")
-    print(json.dumps(verdict.model_dump(), ensure_ascii=False, indent=2))
+    logger.info("AI Analysis Result JSON:")
+    logger.info(json.dumps(verdict.model_dump(), ensure_ascii=False, indent=2))
 
     # Save structured results to state and add an AIMessage for tracking
     return {
