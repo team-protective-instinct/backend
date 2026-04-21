@@ -4,8 +4,7 @@ from langgraph.prebuilt import ToolNode
 from psycopg_pool import ConnectionPool
 
 from .nodes import (
-    finalize_verdict,
-    generate_incident_report,
+    generate_final_report,
     reason_and_act,
     should_continue,
 )
@@ -25,15 +24,13 @@ class ThreatAnalyzerAgent:
         workflow = StateGraph(AgentState)
         workflow.add_node("agent", reason_and_act)
         workflow.add_node("tools", ToolNode(tools))
-        workflow.add_node("finalize", finalize_verdict)
-        workflow.add_node("generate_report", generate_incident_report)
+        workflow.add_node("generate_report", generate_final_report)
         
         workflow.add_edge(START, "agent")
         workflow.add_conditional_edges(
-            "agent", should_continue, {"tools": "tools", "finalize": "finalize"}
+            "agent", should_continue, {"tools": "tools", "finalize": "generate_report"}
         )
         workflow.add_edge("tools", "agent")
-        workflow.add_edge("finalize", "generate_report")
         workflow.add_edge("generate_report", END)
 
         # Postgres 체크포인터 설정

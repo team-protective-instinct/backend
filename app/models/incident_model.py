@@ -12,8 +12,7 @@ class Incident(Base):
     title = mapped_column(String(255), nullable=False)
     status = mapped_column(String(50), nullable=False)
     evidence_logs = mapped_column(Text, nullable=True) # Text로 변경하여 큰 원본 로그 허용
-    verdict_json = mapped_column(JSON, nullable=True)
-    report_json = mapped_column(JSON, nullable=True)
+    analysis_result = mapped_column(JSON, nullable=True)
     is_identified_threat = mapped_column(Boolean, nullable=True)
     
     created_at = mapped_column(DateTime, default=func.now(), nullable=False)

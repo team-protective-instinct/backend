@@ -3,18 +3,15 @@ import logging
 from typing import cast
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, merge_message_runs
 from .prompt import (
-    INCIDENT_REPORT_SYSTEM_PROMPT,
+    ANALYSIS_REPORT_SYSTEM_PROMPT,
     THREAT_ANALYSIS_AGENT_SYSTEM_PROMPT,
-    VERDICT_SYSTEM_PROMPT,
-    FINALIZE_VERDICT_NUDGE,
     GENERATE_REPORT_NUDGE,
-    ANALYSIS_RESULT_PREFIX,
 )
 from functools import lru_cache
 from .state import AgentState
 from .tools import analyze_payload, check_ip_reputation
 from app.core.llm import get_llm
-from app.schemas.agent_schema import FinalSecurityAnalysis, IncidentReport
+from app.schemas.agent_schema import SecurityAnalysisReport
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +25,7 @@ def _get_llm_resources():
     
     return {
         "llm_with_tools": llm.bind_tools(tools),
-        "llm_verdict": llm.with_structured_output(FinalSecurityAnalysis),
-        "llm_report": llm.with_structured_output(IncidentReport),
+        "llm_analysis_report": llm.with_structured_output(SecurityAnalysisReport),
     }
 
 
@@ -46,58 +42,28 @@ def reason_and_act(state: AgentState):
     return {"messages": [response]}
 
 
-def finalize_verdict(state: AgentState):
+def generate_final_report(state: AgentState):
     """
-    Final security verdict node based on analysis and evidence.
+    Node to generate the final integrated security analysis report.
     """
     resources = _get_llm_resources()
-    verdict_prompt = SystemMessage(content=VERDICT_SYSTEM_PROMPT)
+    report_prompt = SystemMessage(content=ANALYSIS_REPORT_SYSTEM_PROMPT)
 
-    # Nudge the LLM to provide the final verdict
-    nudge_msg = HumanMessage(content=FINALIZE_VERDICT_NUDGE)
+    # Nudge the LLM to provide the final integrated report
+    nudge_msg = HumanMessage(content=GENERATE_REPORT_NUDGE)
     
-    messages = merge_message_runs([verdict_prompt] + state["messages"] + [nudge_msg])
-    verdict = cast(FinalSecurityAnalysis, resources["llm_verdict"].invoke(messages))
+    messages = merge_message_runs([report_prompt] + state["messages"] + [nudge_msg])
+    report = cast(SecurityAnalysisReport, resources["llm_analysis_report"].invoke(messages))
 
     logger.info("AI Analysis Result JSON:")
-    logger.info(json.dumps(verdict.model_dump(), ensure_ascii=False, indent=2))
+    logger.info(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
 
     # Save structured results to state and add an AIMessage for tracking
     return {
-        "final_analysis": verdict,
+        "analysis_result": report,
         "messages": [
-            AIMessage(content=f"[Final Verdict Completed] {verdict.executive_summary}")
+            AIMessage(content=f"[Analysis & Reporting Completed] Verdict: {'TP' if report.is_true_positive else 'FP'}")
         ],
-    }
-
-
-def generate_incident_report(state: AgentState):
-    """
-    Node to generate the final incident report based on the verdict.
-    """
-    resources = _get_llm_resources()
-    report_prompt = SystemMessage(content=INCIDENT_REPORT_SYSTEM_PROMPT)
-
-    # Include the verdict as a text message
-    final_analysis = state.get("final_analysis")
-    if not final_analysis:
-        raise ValueError("final_analysis is missing in AgentState")
-
-    analysis_result_msg = HumanMessage(
-        content=f"{ANALYSIS_RESULT_PREFIX}{json.dumps(final_analysis.model_dump(), ensure_ascii=False)}"
-    )
-    
-    # Nudge the LLM to write the report
-    nudge_msg = HumanMessage(content=GENERATE_REPORT_NUDGE)
-
-    messages = merge_message_runs(
-        [report_prompt] + state["messages"] + [analysis_result_msg] + [nudge_msg]
-    )
-    report = resources["llm_report"].invoke(messages)
-
-    return {
-        "incident_report": report,
-        "messages": [AIMessage(content="[Incident Report Generation Completed]")],
     }
 
 

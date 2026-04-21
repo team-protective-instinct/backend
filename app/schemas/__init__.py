@@ -1,9 +1,7 @@
 from .user_schema import UserBase, UserCreate, User, UserSignIn
 from .agent_schema import (
-    Severity,
     IndicatorEvaluation,
-    FinalSecurityAnalysis,
-    IncidentReport,
+    SecurityAnalysisReport,
 )
 from .webhook_schema import LogEntry, WebhookAlertRequest
 
@@ -12,10 +10,8 @@ __all__ = [
     "UserCreate",
     "User",
     "UserSignIn",
-    "Severity",
     "IndicatorEvaluation",
-    "FinalSecurityAnalysis",
-    "IncidentReport",
+    "SecurityAnalysisReport",
     "LogEntry",
     "WebhookAlertRequest",
 ]
