@@ -3,6 +3,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 from psycopg_pool import ConnectionPool
 
+from .constants import AnalyzerNodeName
+
 from .nodes import (
     generate_final_report,
     reason_and_act,
@@ -20,23 +22,28 @@ class ThreatAnalyzerAgent:
     def _build_graph(self):
         """에이전트 그래프를 생성하고 컴파일합니다."""
         tools = [check_ip_reputation, analyze_payload]
-        
+
         workflow = StateGraph(AgentState)
-        workflow.add_node("agent", reason_and_act)
-        workflow.add_node("tools", ToolNode(tools))
-        workflow.add_node("generate_report", generate_final_report)
-        
-        workflow.add_edge(START, "agent")
+        workflow.add_node(AnalyzerNodeName.AGENT, reason_and_act)
+        workflow.add_node(AnalyzerNodeName.TOOLS, ToolNode(tools))
+        workflow.add_node(AnalyzerNodeName.GENERATE_REPORT, generate_final_report)
+
+        workflow.add_edge(START, AnalyzerNodeName.AGENT)
         workflow.add_conditional_edges(
-            "agent", should_continue, {"tools": "tools", "finalize": "generate_report"}
+            AnalyzerNodeName.AGENT,
+            should_continue,
+            {
+                AnalyzerNodeName.TOOLS: AnalyzerNodeName.TOOLS,
+                AnalyzerNodeName.GENERATE_REPORT: AnalyzerNodeName.GENERATE_REPORT,
+            },
         )
-        workflow.add_edge("tools", "agent")
-        workflow.add_edge("generate_report", END)
+        workflow.add_edge(AnalyzerNodeName.TOOLS, AnalyzerNodeName.AGENT)
+        workflow.add_edge(AnalyzerNodeName.GENERATE_REPORT, END)
 
         # Postgres 체크포인터 설정
         postgres_checkpointer = PostgresSaver(self.db_pool)  # type: ignore
         postgres_checkpointer.setup()
-        
+
         return workflow.compile(checkpointer=postgres_checkpointer)
 
     def invoke(self, input_data: dict, config: dict):
