@@ -1,6 +1,8 @@
 import logging
-from fastapi import APIRouter, BackgroundTasks
-from app.services.incident_service import incident_analysis
+from fastapi import APIRouter, BackgroundTasks, Depends
+from dependency_injector.wiring import inject, Provide
+from app.services.incident_service import IncidentService
+from app.core.container import Container
 from app.schemas import (
     LogEntry,
     WebhookAlertRequest,
@@ -32,14 +34,14 @@ def _logs_to_text(logs: list[LogEntry]) -> str:
     return "\n\n".join(parts)
 
 
-def _run_analysis_background(alert_name: str, log_text: str):
+def _run_analysis_background(alert_name: str, log_text: str, incident_service: IncidentService):
     """백그라운드에서 위협 분석을 실행합니다 (비동기 엔드포인트용)."""
     print("\n" + "=" * 50)
     print(f"🚨 [Webhook] 알림 '{alert_name}' 접수 - 백그라운드 분석 시작")
     print("=" * 50)
 
     try:
-        incident_analysis(log_text)
+        incident_service.incident_analysis(log_text)
         logger.info(f"백그라운드 분석 완료 - alert={alert_name}")
     except Exception:
         logger.exception(f"위협 분석 중 오류 발생 - alert={alert_name}")
@@ -55,9 +57,11 @@ def _run_analysis_background(alert_name: str, log_text: str):
         "즉시 접수 확인 응답을 반환합니다."
     ),
 )
+@inject
 async def webhook_receive(
     request: WebhookAlertRequest,
     background_tasks: BackgroundTasks,
+    incident_service: IncidentService = Depends(Provide[Container.incident_service])
 ):
     log_text = _logs_to_text(request.logs)
-    background_tasks.add_task(_run_analysis_background, request.alert_name, log_text)
+    background_tasks.add_task(_run_analysis_background, request.alert_name, log_text, incident_service)
