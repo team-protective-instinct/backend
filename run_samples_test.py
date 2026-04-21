@@ -1,11 +1,15 @@
 import os
 import glob
-from app.services.incident_service import incident_analysis
+from app.core.container import Container
 
 def main():
     """
     sample_logs 디렉토리의 모든 로그 파일을 읽어 위협 분석을 수행하는 테스트 스크립트입니다.
     """
+    # 0. 의존성 주입 컨테이너 초기화
+    container = Container()
+    incident_service = container.incident_service()
+
     # 1. 샘플 로그 디렉토리 확인
     sample_dir = "sample_logs"
     
@@ -34,7 +38,7 @@ def main():
                 log_content = f.read()
             
             # 실제 서비스 로직 호출
-            incident_analysis(log_content)
+            incident_service.incident_analysis(log_content)
             
         except Exception as e:
             print(f"!!! Error processing {filename}: {str(e)}")
