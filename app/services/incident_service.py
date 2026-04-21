@@ -35,8 +35,7 @@ class IncidentService:
         db: Session,
         title: str,
         raw_log: str,
-        verdict_data: dict | None,
-        report_data: dict | None,
+        analysis_data: dict | None,
         is_threat: bool,
         thread_id: str,
     ) -> Incident:
@@ -45,8 +44,7 @@ class IncidentService:
             title=title,
             status="completed",
             evidence_logs=raw_log,
-            verdict_json=verdict_data,
-            report_json=report_data,
+            analysis_result=analysis_data,
             is_identified_threat=is_threat,
         )
         db.add(incident)
@@ -79,8 +77,7 @@ class IncidentService:
 
         initial_state: AgentState = {
             "messages": [HumanMessage(content=f"{LOG_ANALYSIS_REQUEST_PREFIX}{log_text}")],
-            "final_analysis": None,  # type: ignore
-            "incident_report": None,  # type: ignore
+            "analysis_result": None,  # type: ignore
             "context": {"source": "log_analytics_service"},
         }
 
@@ -91,27 +88,23 @@ class IncidentService:
             initial_state, config={"configurable": {"thread_id": thread_id}}
         )
 
-        verdict_dict = None
-        report_dict = None
+        analysis_dict = None
         is_threat = False
 
-        if final_state.get("final_analysis"):
-            analysis = final_state["final_analysis"]
-            verdict_dict = analysis.model_dump()
+        if final_state.get("analysis_result"):
+            analysis = final_state["analysis_result"]
+            analysis_dict = analysis.model_dump()
             is_threat = analysis.is_true_positive
 
-            logger.info("[Step 1: Final Verdict Completed]")
+            logger.info("[Threat Analysis Completed]")
             logger.info(f" - Verdict: {'True Positive' if is_threat else 'False Positive'}")
             logger.info(f" - Confidence Score: {analysis.confidence_score}")
+            logger.info(f" - Attack Type: {analysis.attack_type}")
             logger.info(f" - Summary: {analysis.executive_summary}")
-
-        if final_state.get("incident_report"):
-            report = final_state["incident_report"]
-            report_dict = report.model_dump()
-            logger.info("[Step 2: Incident Report Generated]")
-            logger.info(
+            
+            logger.debug(
                 json.dumps(
-                    report_dict,
+                    analysis_dict,
                     ensure_ascii=False,
                     indent=2,
                 )
@@ -125,8 +118,7 @@ class IncidentService:
                     db=db,
                     title=f"Auto Log Analysis - {thread_id[:8]}",
                     raw_log=log_text,
-                    verdict_data=verdict_dict,
-                    report_data=report_dict,
+                    analysis_data=analysis_dict,
                     is_threat=is_threat,
                     thread_id=thread_id,
                 )

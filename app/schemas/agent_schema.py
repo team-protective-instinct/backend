@@ -1,15 +1,5 @@
-from enum import Enum
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Dict
 from pydantic import BaseModel, Field
-
-class Severity(str, Enum):
-    """Severity levels of the incident""" # 사건의 심각도 수준
-
-    CRITICAL = "Critical"
-    HIGH = "High"
-    MEDIUM = "Medium"
-    LOW = "Low"
-    INFO = "Info"
 
 
 IndicatorName = Literal[
@@ -35,38 +25,27 @@ class IndicatorEvaluation(BaseModel):
     reasoning: str = Field(description="Logical reasoning for the detection with log evidence (1-2 sentences)") # 해당 판단에 대한 구체적 로그 근거 (1~2문장)
 
 
-class FinalSecurityAnalysis(BaseModel):
-    """Final decision of the threat analysis (Structured Output)""" # 정오탐 판별 최종 결과
+class SecurityAnalysisReport(BaseModel):
+    """Integrated security analysis report for final verdict and future response planning"""
+    # 최종 통합 보안 분석 보고서: 정오탐 판정 결과와 함께 대응 에이전트가 사용할 핵심 데이터를 포함합니다.
 
-    # Step 1: List only relevant indicators (Token Efficiency)
-    key_indicators: List[IndicatorEvaluation] = Field(
-        min_length=1, 
-        description="List of key indicators used for analysis. Irrelevant indicators can be omitted."
-    ) # 분석에 사용된 주요 지표 목록 (관련 없는 지표는 제외 가능)
-
-    # Step 2: Executive Summary
-    executive_summary: str = Field(
-        description="A concise reasoning that synthesizes the indicators to explain the verdict (within 3 sentences)"
-    ) # 검토된 지표들을 종합하여 정탐/오탐 이유를 설명하는 3문장 이내의 종합 논증
-
-    # Step 3: Final Decision
+    # --- [Step 1: Verdict & Confidence] ---
     is_true_positive: bool = Field(description="Final classification result (True: True Positive, False: False Positive)") # 최종 판결 (True: 정탐, False: 오탐)
     confidence_score: float = Field(ge=0.0, le=1.0, description="Confidence level of the verdict (0-1)") # 판정에 대한 신뢰도 점수 (0~1)
 
+    # --- [Step 2: Summary & Classification] ---
+    executive_summary: str = Field(
+        description="A concise reasoning that synthesizes the indicators to explain the verdict (within 3 sentences)"
+    ) # 검토된 지표들을 종합하여 정탐/오탐 이유를 설명하는 3문장 이내의 종합 요약
+    attack_type: str = Field(description="Name of the attack type (e.g., SQL Injection, Brute Force)") # 공격 유형 명칭
+    mitre_attack_ids: List[str] = Field(description="List of relevant MITRE ATT&CK Technique IDs (e.g., T1190)") # 관련 MITRE ATT&CK ID 목록
 
-
-class IncidentReport(BaseModel):
-    """Final incident report for management and response teams""" # 최종 사건 보고서 (경영진/실무 대응용)
-
-    summary: str = Field(description="High-level summary including timestamp, attack type, and final verdict") # 사건 발생 일시, 공격 유형, 최종 판결을 포함한 핵심 요약
-    severity: Severity = Field(description="Severity level of the threat") # 위협의 심각도 단계
-    threat_indicators: List[str] = Field(
-        description="IOC list including attacker IPs, target URIs, and malicious payloads"
-    ) # IOC 리스트 (공격자 IP, 대상 URI, 악성 페이로드 등)
-    mitre_attack_mapping: Optional[str] = Field(
-        description="Relevant MITRE ATT&CK Tactics and Techniques (e.g., T1059.003)"
-    ) # 관련 MITRE ATT&CK Tactic 및 Technique (예: T1059.003)
+    # --- [Step 3: Detailed Evidence for Responder Agent] ---
     detailed_analysis: str = Field(description="Detailed analysis content summarizing the CoT reasoning in natural language") # CoT 분석 근거를 자연스러운 문장으로 요약한 상세 내용
-    recommended_actions: List[str] = Field(
-        description="Detailed list of response actions (e.g., block IP, deeper inspection, FP exception)"
-    ) # 즉각적인 차단, 점검, 예외 처리 등 대응 방안 리스트
+    key_indicators: List[IndicatorEvaluation] = Field(
+        min_length=1, 
+        description="List of key indicators used for analysis. Irrelevant indicators can be omitted."
+    ) # 분석에 사용된 주요 지표 목록
+    iocs: Dict[str, List[str]] = Field(
+        description="Structured list of IOCs including attacker_ips, target_uris, and suspicious_payloads"
+    ) # 공격자 IP, 대상 URI, 악성 페이로드 등을 포함한 구조화된 IOC 목록
