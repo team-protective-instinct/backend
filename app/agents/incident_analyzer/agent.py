@@ -1,6 +1,7 @@
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
+from langchain_core.runnables import RunnableConfig
 from psycopg_pool import ConnectionPool
 
 from .constants import AnalyzerNodeName
@@ -46,5 +47,5 @@ class ThreatAnalyzerAgent:
 
         return workflow.compile(checkpointer=postgres_checkpointer)
 
-    def invoke(self, input_data: dict, config: dict):
+    def invoke(self, input_data: AgentState, config: RunnableConfig):
         return self.graph.invoke(input_data, config=config)
