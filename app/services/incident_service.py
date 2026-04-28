@@ -5,6 +5,7 @@ from typing import Optional, List, Callable
 from langchain_core.messages import HumanMessage
 from sqlalchemy.orm import Session
 from app.models import Incident
+from app.models.constants import IncidentStatus
 from app.agents.incident_analyzer.state import AgentState
 from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
@@ -38,14 +39,22 @@ class IncidentService:
         analysis_data: dict | None,
         is_threat: bool,
         thread_id: str,
+        severity: str | None = None,
+        attack_type: str | None = None,
+        confidence_score: float | None = None,
+        attacker_ip: str | None = None,
     ) -> Incident:
         incident = Incident(
             thread_id=thread_id,
             title=title,
-            status="completed",
+            status=IncidentStatus.PENDING_REVIEW if is_threat else IncidentStatus.RESOLVED,
             evidence_logs=raw_log,
             analysis_result=analysis_data,
             is_identified_threat=is_threat,
+            severity=severity,
+            attack_type=attack_type,
+            confidence_score=confidence_score,
+            attacker_ip=attacker_ip,
         )
         db.add(incident)
         db.commit()
@@ -54,7 +63,7 @@ class IncidentService:
 
     def get_pending_incidents(self) -> List[Incident]:
         with self.session_factory() as db:
-            return db.query(Incident).filter(Incident.status == "pending").all()
+            return db.query(Incident).filter(Incident.status == IncidentStatus.PENDING_REVIEW).all()
 
     def get_incident_by_idx(self, incident_idx: int) -> Optional[Incident]:
         with self.session_factory() as db:
@@ -90,16 +99,26 @@ class IncidentService:
 
         analysis_dict = None
         is_threat = False
+        severity = None
+        attack_type = None
+        confidence_score = None
+        attacker_ip = None
 
         if final_state.get("analysis_result"):
             analysis = final_state["analysis_result"]
             analysis_dict = analysis.model_dump()
             is_threat = analysis.is_true_positive
+            severity = analysis.severity
+            attack_type = analysis.attack_type
+            confidence_score = analysis.confidence_score
+            attacker_ip = analysis.iocs.attacker_ips[0] if analysis.iocs.attacker_ips else None
 
             logger.info("[Threat Analysis Completed]")
             logger.info(f" - Verdict: {'True Positive' if is_threat else 'False Positive'}")
-            logger.info(f" - Confidence Score: {analysis.confidence_score}")
-            logger.info(f" - Attack Type: {analysis.attack_type}")
+            logger.info(f" - Severity: {severity}")
+            logger.info(f" - Confidence Score: {confidence_score}")
+            logger.info(f" - Attack Type: {attack_type}")
+            logger.info(f" - Primary Attacker IP: {attacker_ip}")
             logger.info(f" - Summary: {analysis.executive_summary}")
             
             logger.debug(
@@ -121,6 +140,10 @@ class IncidentService:
                     analysis_data=analysis_dict,
                     is_threat=is_threat,
                     thread_id=thread_id,
+                    severity=severity,
+                    attack_type=attack_type,
+                    confidence_score=confidence_score,
+                    attacker_ip=attacker_ip,
                 )
                 logger.info(f"DB Storage Completed (Thread ID: {thread_id})")
             except Exception as e:

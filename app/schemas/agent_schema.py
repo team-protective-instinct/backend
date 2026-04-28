@@ -25,6 +25,25 @@ class IndicatorEvaluation(BaseModel):
     reasoning: str = Field(description="Logical reasoning for the detection with log evidence (1-2 sentences)") # 해당 판단에 대한 구체적 로그 근거 (1~2문장)
 
 
+SeverityLevel = Literal["critical", "high", "medium", "low"]
+
+
+class IncidentIOCs(BaseModel):
+    """Structured Indicators of Compromise extracted from log analysis"""
+    attacker_ips: List[str] = Field(
+        default_factory=list,
+        description="List of attacker IP addresses identified in the logs"
+    ) # 공격자 IP 목록
+    target_uris: List[str] = Field(
+        default_factory=list,
+        description="List of targeted URIs or endpoints"
+    ) # 공격 대상 URI 목록
+    suspicious_payloads: List[str] = Field(
+        default_factory=list,
+        description="List of suspicious payloads or strings found in requests"
+    ) # 의심 페이로드 목록
+
+
 class SecurityAnalysisReport(BaseModel):
     """Integrated security analysis report for final verdict and future response planning"""
     # 최종 통합 보안 분석 보고서: 정오탐 판정 결과와 함께 대응 에이전트가 사용할 핵심 데이터를 포함합니다.
@@ -38,14 +57,21 @@ class SecurityAnalysisReport(BaseModel):
         description="A concise reasoning that synthesizes the indicators to explain the verdict (within 3 sentences)"
     ) # 검토된 지표들을 종합하여 정탐/오탐 이유를 설명하는 3문장 이내의 종합 요약
     attack_type: str = Field(description="Name of the attack type (e.g., SQL Injection, Brute Force)") # 공격 유형 명칭
-    mitre_attack_ids: List[str] = Field(description="List of relevant MITRE ATT&CK Technique IDs (e.g., T1190)") # 관련 MITRE ATT&CK ID 목록
+    severity: SeverityLevel = Field(
+        description=(
+            "Overall severity of this incident. "
+            "critical: active exploitation with high-confidence TP, "
+            "high: strong evidence of attack, "
+            "medium: suspicious but unconfirmed, "
+            "low: minor anomaly or likely FP"
+        )
+    ) # 인시던트 심각도
 
-    # --- [Step 3: Detailed Evidence for Responder Agent] ---
-    detailed_analysis: str = Field(description="Detailed analysis content summarizing the CoT reasoning in natural language") # CoT 분석 근거를 자연스러운 문장으로 요약한 상세 내용
+    # --- [Step 3: Evidence & IOCs] ---
     key_indicators: List[IndicatorEvaluation] = Field(
         min_length=1, 
         description="List of key indicators used for analysis. Irrelevant indicators can be omitted."
     ) # 분석에 사용된 주요 지표 목록
-    iocs: Dict[str, List[str]] = Field(
+    iocs: IncidentIOCs = Field(
         description="Structured list of IOCs including attacker_ips, target_uris, and suspicious_payloads"
     ) # 공격자 IP, 대상 URI, 악성 페이로드 등을 포함한 구조화된 IOC 목록
