@@ -4,10 +4,10 @@ from app.core.config import Settings
 
 
 class JWTService:
-    def __init__(self, settings: Settings):
-        self.settings = settings
+    def __init__(self, settings: Settings) -> None:
+        self.settings: Settings = settings
 
-    def create_access_token(self, data: dict):
+    def create_access_token(self, data: dict[str, object]) -> str:
         to_encode = data.copy()
         access_token_expires = timedelta(minutes=self.settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode.update({"exp": datetime.utcnow() + access_token_expires})
