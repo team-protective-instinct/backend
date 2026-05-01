@@ -1,5 +1,5 @@
-from typing import NotRequired, TypedDict
-from langgraph.graph import MessagesState
+from typing import NotRequired
+from langgraph.graph import MessagesState  # pyright: ignore[reportMissingTypeStubs]
 from app.schemas.agent_schema import SecurityAnalysisReport
 
 
@@ -12,4 +12,4 @@ class AgentState(MessagesState):
     """
 
     analysis_result: NotRequired[SecurityAnalysisReport]
-    context: NotRequired[dict]
+    context: NotRequired[dict[str, object]]

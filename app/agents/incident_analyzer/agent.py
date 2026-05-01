@@ -2,6 +2,8 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 from langchain_core.runnables import RunnableConfig
+from psycopg import Connection
+from psycopg.rows import DictRow
 from psycopg_pool import ConnectionPool
 
 from .constants import AnalyzerNodeName
@@ -16,7 +18,7 @@ from .tools import analyze_payload, check_ip_reputation
 
 
 class ThreatAnalyzerAgent:
-    def __init__(self, db_pool: ConnectionPool):
+    def __init__(self, db_pool: ConnectionPool[Connection[DictRow]]):
         self.db_pool = db_pool
         self.graph = self._build_graph()
 
@@ -42,7 +44,7 @@ class ThreatAnalyzerAgent:
         workflow.add_edge(AnalyzerNodeName.GENERATE_REPORT, END)
 
         # Postgres 체크포인터 설정
-        postgres_checkpointer = PostgresSaver(self.db_pool)  # type: ignore
+        postgres_checkpointer = PostgresSaver(self.db_pool)
         postgres_checkpointer.setup()
 
         return workflow.compile(checkpointer=postgres_checkpointer)
