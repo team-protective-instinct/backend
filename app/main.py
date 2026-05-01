@@ -1,5 +1,6 @@
 import logging
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.container import Container
 from app.controllers import webhook_controller, user_controller, incident_controller
 
@@ -13,20 +14,32 @@ logging.basicConfig(
 
 def create_app() -> FastAPI:
     container = Container()
-    
+
     # Wiring
-    container.wire(modules=[
-        webhook_controller,
-        user_controller,
-        incident_controller,
-    ])
+    container.wire(
+        modules=[
+            webhook_controller,
+            user_controller,
+            incident_controller,
+        ]
+    )
 
     # Create tables
     db = container.db()
     db.create_database()
 
     app = FastAPI()
-    app.container = container  # type: ignore
+    app.state.container = container
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:8081",
+            "http://127.0.0.1:8081",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # Register routers
     app.include_router(webhook_controller.router)
