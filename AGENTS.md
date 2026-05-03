@@ -1,5 +1,7 @@
 # AI Agent Instructions for capstone-backend
 
+> **Workspace context**: This is part of a multi-project workspace. See root [AGENTS.md](../AGENTS.md) for overall architecture, data flow, and startup order.
+
 ## Environment and commands
 - Package manager is `uv`, but agents must not run `uv sync`, `uv add`, `uv pip install`, or other `uv` commands. If dependencies/env sync are needed, tell the user the exact command to run.
 - Use the project interpreter directly for agent-run Python commands: `.venv/bin/python ...`.
