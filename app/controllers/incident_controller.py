@@ -8,6 +8,7 @@ from app.schemas.incident_schema import (
     IncidentListItemResponse,
     IncidentListResponse,
     SeverityFilter,
+    OverviewSummaryResponse,
 )
 
 
@@ -32,7 +33,10 @@ def get_incidents(
         q=q,
     )
     return IncidentListResponse(
-        items=[IncidentListItemResponse.from_incident(incident) for incident in result.items],
+        items=[
+            IncidentListItemResponse.from_incident(incident)
+            for incident in result.items
+        ],
         page=result.page,
         limit=result.limit,
         total=result.total,
@@ -47,6 +51,15 @@ def get_pending_incidents(
 ):
     incidents = incident_service.get_pending_incidents()
     return [IncidentListItemResponse.from_incident(incident) for incident in incidents]
+
+
+@router.get("/summary", response_model=OverviewSummaryResponse)
+@inject
+def get_overview_summary(
+    incident_service: IncidentService = Depends(Provide[Container.incident_service]),
+):
+    result = incident_service.get_summary()
+    return OverviewSummaryResponse.from_incident_summary(result)
 
 
 @router.get("/{incident_idx}", response_model=IncidentDetailResponse)

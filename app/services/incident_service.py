@@ -6,12 +6,13 @@ from typing import Callable, cast
 from langchain_core.messages import HumanMessage
 from sqlalchemy import String, cast as sql_cast, func, or_
 from sqlalchemy.orm import Session
-from app.dtos import IncidentListResult
+from app.dtos import IncidentListResult, IncidentSummaryResult
 from app.models import Incident
 from app.models.constants import IncidentStatus
 from app.agents.incident_analyzer.state import AgentState
 from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
+from datetime import datetime
 
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,48 @@ class IncidentService:
     def get_incident_by_idx(self, incident_idx: int) -> Incident | None:
         with self.session_factory() as db:
             return db.query(Incident).filter(Incident.idx == incident_idx).first()
+
+    def get_summary(self) -> IncidentSummaryResult:
+        with self.session_factory() as db:
+            today_start = datetime.now().replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+
+            pending_count = (
+                db.query(func.count(Incident.idx))
+                .filter(Incident.status == IncidentStatus.PENDING_REVIEW)
+                .scalar()
+                or 0
+            )
+
+            today_count = (
+                db.query(func.count(Incident.idx))
+                .filter(Incident.created_at >= today_start)
+                .scalar()
+                or 0
+            )
+
+            resolved_count = (
+                db.query(func.count(Incident.idx))
+                .filter(Incident.status == IncidentStatus.RESOLVED)
+                .scalar()
+                or 0
+            )
+
+            recent_pending = (
+                db.query(Incident)
+                .filter(Incident.status == IncidentStatus.PENDING_REVIEW)
+                .order_by(Incident.created_at.desc())
+                .limit(5)
+                .all()
+            )
+
+            return IncidentSummaryResult(
+                pending_count=pending_count,
+                today_count=today_count,
+                resolved_count=resolved_count,
+                recent_pending=recent_pending,
+            )
 
     def approve_incident(self, incident_idx: int) -> None:
         # TODO: Implement approve logic
