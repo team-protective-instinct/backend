@@ -16,5 +16,4 @@ class IncidentSummaryResult:
     pending_count: int
     today_count: int
     resolved_count: int
-    critical_count: int
     recent_pending: list[Incident]

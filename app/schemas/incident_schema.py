@@ -183,7 +183,6 @@ class OverviewSummaryResponse(BaseModel):
     pending_count: int
     today_count: int
     resolved_count: int
-    critical_count: int
     recent_pending: list[IncidentListItemResponse]
 
     @classmethod
@@ -199,6 +198,5 @@ class OverviewSummaryResponse(BaseModel):
             pending_count=incident.pending_count,
             today_count=incident.today_count,
             resolved_count=incident.resolved_count,
-            critical_count=incident.critical_count,
             recent_pending=recent_pending,
         )

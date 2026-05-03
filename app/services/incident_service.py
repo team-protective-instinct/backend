@@ -145,13 +145,6 @@ class IncidentService:
                 or 0
             )
 
-            critical_count = (
-                db.query(func.count(Incident.idx))
-                .filter(Incident.severity == "critical")
-                .scalar()
-                or 0
-            )
-
             recent_pending = (
                 db.query(Incident)
                 .filter(Incident.status == IncidentStatus.PENDING_REVIEW)
@@ -164,7 +157,6 @@ class IncidentService:
                 pending_count=pending_count,
                 today_count=today_count,
                 resolved_count=resolved_count,
-                critical_count=critical_count,
                 recent_pending=recent_pending,
             )
 
