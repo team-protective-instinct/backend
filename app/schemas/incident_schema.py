@@ -4,9 +4,11 @@ from typing import Literal, TYPE_CHECKING
 from enum import Enum
 from pydantic import BaseModel, Field
 
+from app.dtos import IncidentSummaryResult
+
 if TYPE_CHECKING:
     from app.models import Incident
-    from app.schemas.agent_schema import AnalysisReport, IndicatorEvaluation
+    from app.schemas.agent_schema import IndicatorEvaluation
 
 
 class SeverityFilter(str, Enum):
@@ -36,7 +38,9 @@ class IncidentKeyIndicatorResponse(BaseModel):
     description: str
 
     @classmethod
-    def from_indicator_evaluation(cls, indicator: "IndicatorEvaluation") -> "IncidentKeyIndicatorResponse":
+    def from_indicator_evaluation(
+        cls, indicator: "IndicatorEvaluation"
+    ) -> "IncidentKeyIndicatorResponse":
         label = indicator.name.replace("_", " ").title()
         return cls(
             label=label,
@@ -103,7 +107,11 @@ class IncidentDetailResponse(BaseModel):
 
     @classmethod
     def from_incident(cls, incident: "Incident") -> "IncidentDetailResponse":
-        analysis = incident.analysis_result if isinstance(incident.analysis_result, dict) else {}
+        analysis = (
+            incident.analysis_result
+            if isinstance(incident.analysis_result, dict)
+            else {}
+        )
 
         key_indicators: list[IncidentKeyIndicatorResponse] = []
         raw_key_indicators = analysis.get("key_indicators")
@@ -112,8 +120,13 @@ class IncidentDetailResponse(BaseModel):
                 if isinstance(indicator_data, dict):
                     try:
                         from app.schemas.agent_schema import IndicatorEvaluation
+
                         indicator = IndicatorEvaluation.model_validate(indicator_data)
-                        key_indicators.append(IncidentKeyIndicatorResponse.from_indicator_evaluation(indicator))
+                        key_indicators.append(
+                            IncidentKeyIndicatorResponse.from_indicator_evaluation(
+                                indicator
+                            )
+                        )
                     except Exception:
                         pass
 
@@ -121,13 +134,23 @@ class IncidentDetailResponse(BaseModel):
         severity_str: str = str(severity) if severity else "low"
 
         attack_ip = analysis.get("attack_ip")
-        attack_ip_str: str | None = str(attack_ip) if isinstance(attack_ip, (str, int)) else incident.attacker_ip
+        attack_ip_str: str | None = (
+            str(attack_ip)
+            if isinstance(attack_ip, (str, int))
+            else incident.attacker_ip
+        )
 
         target_uris_data = analysis.get("target_uris")
-        target_uris: list[str] = target_uris_data if isinstance(target_uris_data, list) else []
+        target_uris: list[str] = (
+            target_uris_data if isinstance(target_uris_data, list) else []
+        )
 
         suspicious_payloads_data = analysis.get("suspicious_payloads")
-        suspicious_payloads: list[str] = suspicious_payloads_data if isinstance(suspicious_payloads_data, list) else []
+        suspicious_payloads: list[str] = (
+            suspicious_payloads_data
+            if isinstance(suspicious_payloads_data, list)
+            else []
+        )
 
         return cls(
             idx=incident.idx,
@@ -154,3 +177,28 @@ class IncidentListResponse(BaseModel):
     limit: int
     total: int
     total_pages: int
+
+
+class OverviewSummaryResponse(BaseModel):
+    pending_count: int
+    today_count: int
+    resolved_count: int
+    critical_count: int
+    recent_pending: list[IncidentListItemResponse]
+
+    @classmethod
+    def from_incident_summary(
+        cls, incident: IncidentSummaryResult
+    ) -> "OverviewSummaryResponse":
+        recent_pending = [
+            IncidentListItemResponse.from_incident(recent)
+            for recent in incident.recent_pending
+        ]
+
+        return cls(
+            pending_count=incident.pending_count,
+            today_count=incident.today_count,
+            resolved_count=incident.resolved_count,
+            critical_count=incident.critical_count,
+            recent_pending=recent_pending,
+        )
