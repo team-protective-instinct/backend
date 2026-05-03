@@ -1,0 +1,156 @@
+from datetime import datetime
+from typing import Literal, TYPE_CHECKING
+
+from enum import Enum
+from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from app.models import Incident
+    from app.schemas.agent_schema import AnalysisReport, IndicatorEvaluation
+
+
+class SeverityFilter(str, Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+Severity = Literal["critical", "high", "medium", "low"]
+IncidentStatus = Literal[
+    "analyzing",
+    "pending_review",
+    "resolved",
+    "dismissed",
+]
+
+
+class IncidentIOCsResponse(BaseModel):
+    attacker_ips: list[str] = Field(default_factory=list)
+    target_uris: list[str] = Field(default_factory=list)
+
+
+class IncidentKeyIndicatorResponse(BaseModel):
+    label: str
+    value: bool
+    description: str
+
+    @classmethod
+    def from_indicator_evaluation(cls, indicator: "IndicatorEvaluation") -> "IncidentKeyIndicatorResponse":
+        label = indicator.name.replace("_", " ").title()
+        return cls(
+            label=label,
+            value=indicator.is_detected,
+            description=indicator.reasoning,
+        )
+
+
+class IncidentListItemResponse(BaseModel):
+    idx: int
+    attack_type: str
+    severity: Severity
+    confidence_score: float
+    status: IncidentStatus
+    targetIp: str
+    targetName: str
+    detectedAt: datetime
+    created_at: datetime
+
+    @classmethod
+    def from_incident(cls, incident: "Incident") -> "IncidentListItemResponse":
+        return cls(
+            idx=incident.idx,
+            attack_type=incident.attack_type or "Unknown",
+            severity=cls._normalize_severity(incident.severity),
+            confidence_score=incident.confidence_score or 0.0,
+            status=cls._normalize_status(incident.status),
+            targetIp="192.168.1.50",
+            targetName="Web Server (Victim)",
+            detectedAt=incident.created_at,
+            created_at=incident.created_at,
+        )
+
+    @staticmethod
+    def _normalize_severity(value: str | None) -> Severity:
+        if value in ("critical", "high", "medium", "low"):
+            return value  # type: ignore
+        return "low"
+
+    @staticmethod
+    def _normalize_status(value: str | None) -> IncidentStatus:
+        valid_statuses = ("analyzing", "pending_review", "resolved", "dismissed")
+        if value in valid_statuses:
+            return value  # type: ignore
+        return "analyzing"
+
+
+class IncidentDetailResponse(BaseModel):
+    idx: int
+    attack_type: str
+    severity: str
+    confidence_score: float
+    status: str
+    targetIp: str
+    targetName: str
+    detectedAt: datetime
+    created_at: datetime
+    attack_ip: str | None = None
+    target_uris: list[str] = Field(default_factory=list)
+    suspicious_payloads: list[str] = Field(default_factory=list)
+    analysis_summary: str
+    key_indicators: list[IncidentKeyIndicatorResponse] = Field(default_factory=list)
+    raw_log: str
+
+    @classmethod
+    def from_incident(cls, incident: "Incident") -> "IncidentDetailResponse":
+        analysis = incident.analysis_result if isinstance(incident.analysis_result, dict) else {}
+
+        key_indicators: list[IncidentKeyIndicatorResponse] = []
+        raw_key_indicators = analysis.get("key_indicators")
+        if isinstance(raw_key_indicators, list):
+            for indicator_data in raw_key_indicators:
+                if isinstance(indicator_data, dict):
+                    try:
+                        from app.schemas.agent_schema import IndicatorEvaluation
+                        indicator = IndicatorEvaluation.model_validate(indicator_data)
+                        key_indicators.append(IncidentKeyIndicatorResponse.from_indicator_evaluation(indicator))
+                    except Exception:
+                        pass
+
+        severity = analysis.get("severity")
+        severity_str: str = str(severity) if severity else "low"
+
+        attack_ip = analysis.get("attack_ip")
+        attack_ip_str: str | None = str(attack_ip) if isinstance(attack_ip, (str, int)) else incident.attacker_ip
+
+        target_uris_data = analysis.get("target_uris")
+        target_uris: list[str] = target_uris_data if isinstance(target_uris_data, list) else []
+
+        suspicious_payloads_data = analysis.get("suspicious_payloads")
+        suspicious_payloads: list[str] = suspicious_payloads_data if isinstance(suspicious_payloads_data, list) else []
+
+        return cls(
+            idx=incident.idx,
+            attack_type=incident.attack_type or "Unknown",
+            severity=severity_str,
+            confidence_score=incident.confidence_score or 0.0,
+            status=incident.status or "analyzing",
+            targetIp="192.168.1.50",
+            targetName="Web Server (Victim)",
+            detectedAt=incident.created_at,
+            created_at=incident.created_at,
+            attack_ip=attack_ip_str,
+            target_uris=target_uris,
+            suspicious_payloads=suspicious_payloads,
+            analysis_summary=incident.analysis_summary or "",
+            key_indicators=key_indicators,
+            raw_log=incident.evidence_logs or "",
+        )
+
+
+class IncidentListResponse(BaseModel):
+    items: list[IncidentListItemResponse]
+    page: int
+    limit: int
+    total: int
+    total_pages: int

@@ -16,7 +16,7 @@ class Incident(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default=IncidentStatus.ANALYZING)
     evidence_logs: Mapped[str | None] = mapped_column(Text, nullable=True) # Text로 변경하여 큰 원본 로그 허용
     analysis_result: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
-    executive_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    analysis_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_identified_threat: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     severity: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True) # critical, high, medium, low

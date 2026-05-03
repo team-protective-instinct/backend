@@ -29,20 +29,7 @@ SeverityLevel = Literal["critical", "high", "medium", "low"]
 SuspiciousPayload = Annotated[str, StringConstraints(max_length=120)]
 
 
-class IncidentIOCs(BaseModel):
-    """Structured Indicators of Compromise extracted from log analysis"""
-    attacker_ips: List[str] = Field(
-        default_factory=list,
-        description="List of attacker IP addresses identified in the logs"
-    ) # 공격자 IP 목록
-    suspicious_payloads: List[SuspiciousPayload] = Field(
-        default_factory=list,
-        max_length=3,
-        description="List of suspicious payloads or strings found in requests"
-    ) # 의심 페이로드 목록
-
-
-class SecurityAnalysisReport(BaseModel):
+class AnalysisReport(BaseModel):
     """Integrated security analysis report for final verdict and future response planning"""
     # 최종 통합 보안 분석 보고서: 정오탐 판정 결과와 함께 대응 에이전트가 사용할 핵심 데이터를 포함합니다.
 
@@ -51,7 +38,7 @@ class SecurityAnalysisReport(BaseModel):
     confidence_score: float = Field(ge=0.0, le=1.0, description="Confidence level of the verdict (0-1)") # 판정에 대한 신뢰도 점수 (0~1)
 
     # --- [Step 2: Summary & Classification] ---
-    executive_summary: str = Field(
+    analysis_summary: str = Field(
         max_length=300,
         description="A concise reasoning that explains the verdict (max 2 sentences, 300 chars)"
     ) # 검토된 지표들을 종합하여 정오탐 이유를 짧게 설명하는 요약
@@ -72,6 +59,16 @@ class SecurityAnalysisReport(BaseModel):
         max_length=4,
         description="Up to 4 key indicators used for analysis. Irrelevant indicators can be omitted."
     ) # 분석에 사용된 주요 지표 목록
-    iocs: IncidentIOCs = Field(
-        description="Structured list of IOCs including attacker_ips and suspicious_payloads"
-    ) # 공격자 IP, 악성 페이로드를 포함한 구조화된 IOC 목록
+    attack_ip: str | None = Field(
+        default=None,
+        description="Primary attacker IP address identified in the logs"
+    )
+    target_uris: List[str] = Field(
+        default_factory=list,
+        description="List of target URIs or resources accessed during the incident"
+    )
+    suspicious_payloads: List[SuspiciousPayload] = Field(
+        default_factory=list,
+        max_length=3,
+        description="List of suspicious payloads or strings found in requests"
+    ) # 의심 페이로드 목록
