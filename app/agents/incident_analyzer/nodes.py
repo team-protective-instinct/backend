@@ -18,7 +18,7 @@ from functools import lru_cache
 from .state import AgentState
 from .tools import analyze_payload, check_ip_reputation
 from app.core.llm import get_llm
-from app.schemas.agent_schema import SecurityAnalysisReport
+from app.schemas.agent_schema import AnalysisReport
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def _get_llm_resources():
 
     return {
         "llm_with_tools": llm.bind_tools(tools),
-        "llm_analysis_report": llm.with_structured_output(SecurityAnalysisReport),
+        "llm_analysis_report": llm.with_structured_output(AnalysisReport),
     }
 
 
@@ -62,7 +62,7 @@ def generate_final_report(state: AgentState):
 
     messages = merge_message_runs([report_prompt] + state["messages"] + [nudge_msg])
     report = cast(
-        SecurityAnalysisReport, resources["llm_analysis_report"].invoke(messages)
+        AnalysisReport, resources["llm_analysis_report"].invoke(messages)
     )
 
     logger.info("AI Analysis Result JSON:")

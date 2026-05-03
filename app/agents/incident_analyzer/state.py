@@ -1,6 +1,6 @@
-from typing import NotRequired, TypedDict
-from langgraph.graph import MessagesState
-from app.schemas.agent_schema import SecurityAnalysisReport
+from typing import NotRequired
+from langgraph.graph import MessagesState  # pyright: ignore[reportMissingTypeStubs]
+from app.schemas.agent_schema import AnalysisReport
 
 
 class AgentState(MessagesState):
@@ -11,5 +11,5 @@ class AgentState(MessagesState):
     - context: 에이전트 실행에 필요한 추가 메타데이터 (ID, 설정 등)
     """
 
-    analysis_result: NotRequired[SecurityAnalysisReport]
-    context: NotRequired[dict]
+    analysis_result: NotRequired[AnalysisReport]
+    context: NotRequired[dict[str, object]]
