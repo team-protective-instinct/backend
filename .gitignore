@@ -224,3 +224,6 @@ postgres_data/
 
 # MacOS
 .DS_Store
+
+# opemcode(omo)
+.sisyphus/
