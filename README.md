@@ -72,7 +72,7 @@ docker compose up -d
 동작 중인 데이터베이스를 포함해 모든 준비가 완료되었다면 서버를 실행합니다. `uv run` 명령어로 가상환경 내의 `uvicorn`을 바로 실행할 수 있습니다.
 
 ```bash
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --reload-dir app
 ```
 
 *(참고: `app.main:app`은 `app` 폴더 내 `main.py`의 `app` 인스턴스를 의미합니다.)*
@@ -80,7 +80,7 @@ uv run uvicorn app.main:app --reload
 같은 네트워크의 다른 기기도 FastAPI 서버에 접속할 수 있도록 하려면, `--host` 옵션을 추가하여 서버를 모든 인터페이스에서 수신하도록 설정할 수 있습니다:
 
 ```bash
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
 ```
 
 서버가 실행되면, 브라우저를 열고 FastAPI의 자동 생성 API 문서 메인 화면인 [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) 에 접속하여 제대로 실행되었는지 확인합니다.
