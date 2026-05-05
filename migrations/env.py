@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..'
 
 from app.core.config import settings
 from app.core.database import Base
-from app.models import Incident, User, VictimSystem  # Ensure all models are imported
+from app.models import Incident, RagPlaybook, RagPlaybookChunk, User, VictimSystem  # Ensure all models are imported
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
