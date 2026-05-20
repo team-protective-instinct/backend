@@ -16,16 +16,26 @@ def embed_chunks(
     model: str,
     batch_size: int,
 ) -> list[list[float]]:
-    if settings.OPENAI_API_KEY is None or not settings.OPENAI_API_KEY.strip():
-        raise PlaybookIndexError(
-            "OPENAI_API_KEY is required for playbook embedding generation"
-        )
-
-    embedder = OpenAIEmbeddings(model=model, api_key=SecretStr(settings.OPENAI_API_KEY))
+    embedder = create_embedder(model)
     embeddings: list[list[float]] = []
     for batch in iter_batches(chunks, batch_size):
         embeddings.extend(embedder.embed_documents([chunk.content for chunk in batch]))
     return embeddings
+
+
+def embed_query(query: str, model: str = DEFAULT_EMBEDDING_MODEL) -> list[float]:
+    stripped_query = query.strip()
+    if not stripped_query:
+        raise PlaybookIndexError("Query text is required for playbook retrieval")
+    return create_embedder(model).embed_query(stripped_query)
+
+
+def create_embedder(model: str) -> OpenAIEmbeddings:
+    if settings.OPENAI_API_KEY is None or not settings.OPENAI_API_KEY.strip():
+        raise PlaybookIndexError(
+            "OPENAI_API_KEY is required for playbook embedding generation"
+        )
+    return OpenAIEmbeddings(model=model, api_key=SecretStr(settings.OPENAI_API_KEY))
 
 
 def iter_batches(

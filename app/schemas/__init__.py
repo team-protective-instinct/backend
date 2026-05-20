@@ -11,7 +11,12 @@ from .incident_schema import (
     IncidentListItemResponse,
     IncidentListResponse,
 )
-from .rag_schema import RawPlaybook, PlaybookChunk, PlaybookIndexError
+from .rag_schema import (
+    RawPlaybook,
+    PlaybookChunk,
+    PlaybookIndexError,
+    PlaybookRetrievalResult,
+)
 
 __all__ = [
     "UserBase",
@@ -30,4 +35,5 @@ __all__ = [
     "RawPlaybook",
     "PlaybookChunk",
     "PlaybookIndexError",
+    "PlaybookRetrievalResult",
 ]
