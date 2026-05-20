@@ -21,3 +21,20 @@ class PlaybookChunk:
     section: str | None
     content: str
     metadata: dict[str, object]
+
+
+@dataclass(frozen=True)
+class PlaybookRetrievalResult:
+    playbook_id: int
+    title: str
+    tactic: str
+    source_file: str
+    chunk_idx: int
+    chunk_id: str
+    section: str | None
+    content: str
+    metadata: dict[str, object]
+    recommended_action_hints: list[str]
+    source_refs: list[dict[str, object]]
+    distance: float
+    similarity: float
