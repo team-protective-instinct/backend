@@ -7,6 +7,8 @@ from app.services.jwt_service import JWTService
 from app.services.user_service import UserService
 from app.services.incident_service import IncidentService
 from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
+from app.agents.playbook_agent.agent import PlaybookAgent
+from app.services.playbook_service import PlaybookService
 
 
 class Container(containers.DeclarativeContainer):
@@ -31,6 +33,17 @@ class Container(containers.DeclarativeContainer):
         db_pool=db.provided.pool,
     )
 
+    playbook_agent = providers.Singleton(
+        PlaybookAgent,
+        db_pool=db.provided.pool,
+    )
+
+    playbook_service = providers.Factory(
+        PlaybookService,
+        session_factory=db.provided.session,
+        playbook_agent=playbook_agent,
+    )
+
     user_service = providers.Factory(
         UserService,
         session_factory=db.provided.session,
@@ -41,4 +54,5 @@ class Container(containers.DeclarativeContainer):
         IncidentService,
         session_factory=db.provided.session,
         threat_agent=threat_agent,
+        playbook_service=playbook_service,
     )
