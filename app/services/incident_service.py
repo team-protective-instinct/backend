@@ -12,7 +12,7 @@ from app.models.constants import IncidentStatus
 from app.agents.incident_analyzer.state import AgentState
 from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
-from app.services.playbook_service import PlaybookService
+from app.services.response_plan_service import ResponsePlanService
 from datetime import datetime
 
 
@@ -24,11 +24,11 @@ class IncidentService:
         self,
         session_factory: Callable[..., Session],
         threat_agent: ThreatAnalyzerAgent,
-        playbook_service: PlaybookService,
+        response_plan_service: ResponsePlanService,
     ):
         self.session_factory: Callable[..., Session] = session_factory
         self.threat_agent: ThreatAnalyzerAgent = threat_agent
-        self.playbook_service: PlaybookService = playbook_service
+        self.response_plan_service: ResponsePlanService = response_plan_service
 
     def create_incident_from_analysis(
         self,
@@ -250,7 +250,7 @@ class IncidentService:
 
         if is_threat and created_incident_idx is not None:
             try:
-                self.playbook_service.create_for_incident(created_incident_idx)
+                self.response_plan_service.create_for_incident(created_incident_idx)
             except Exception:
                 logger.exception(
                     "Response plan generation failed - incident_idx=%s",
