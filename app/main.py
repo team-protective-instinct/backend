@@ -2,7 +2,12 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.container import Container
-from app.controllers import webhook_controller, user_controller, incident_controller
+from app.controllers import (
+    webhook_controller,
+    user_controller,
+    incident_controller,
+    response_plan_controller,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -21,6 +26,7 @@ def create_app() -> FastAPI:
             webhook_controller,
             user_controller,
             incident_controller,
+            response_plan_controller,
         ]
     )
 
@@ -45,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(webhook_controller.router)
     app.include_router(user_controller.router)
     app.include_router(incident_controller.router)
+    app.include_router(response_plan_controller.router)
 
     return app
 

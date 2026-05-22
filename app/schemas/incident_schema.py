@@ -7,8 +7,10 @@ from pydantic import BaseModel, Field
 from app.dtos import IncidentSummaryResult
 
 if TYPE_CHECKING:
-    from app.models import Incident
+    from app.models import Incident, ResponsePlan
     from app.schemas.agent_schema import IndicatorEvaluation
+
+from app.schemas.response_plan_schema import ResponsePlanResponse
 
 
 class SeverityFilter(str, Enum):
@@ -104,9 +106,14 @@ class IncidentDetailResponse(BaseModel):
     analysis_summary: str
     key_indicators: list[IncidentKeyIndicatorResponse] = Field(default_factory=list)
     raw_log: str
+    response_plan: ResponsePlanResponse | None = None
 
     @classmethod
-    def from_incident(cls, incident: "Incident") -> "IncidentDetailResponse":
+    def from_incident(
+        cls,
+        incident: "Incident",
+        response_plan: "ResponsePlan | None" = None,
+    ) -> "IncidentDetailResponse":
         analysis = (
             incident.analysis_result
             if isinstance(incident.analysis_result, dict)
@@ -168,6 +175,9 @@ class IncidentDetailResponse(BaseModel):
             analysis_summary=incident.analysis_summary or "",
             key_indicators=key_indicators,
             raw_log=incident.evidence_logs or "",
+            response_plan=ResponsePlanResponse.from_response_plan(response_plan)
+            if response_plan is not None
+            else None,
         )
 
 

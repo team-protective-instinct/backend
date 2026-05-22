@@ -86,25 +86,49 @@ class WebhookAlertRequest(BaseModel):
     ElastAlert2·ModSecurity 등 외부 시스템이 전송하는 알림 페이로드를 수용합니다.
     """
 
+    title: str | None = Field(
+        default=None,
+        description="ElastAlert가 전송한 알림 제목",
+        examples=["SQL Injection 공격 탐지"],
+    )
+    rule_name: str | None = Field(
+        default=None,
+        description="ElastAlert 룰 이름",
+        examples=["SQLi Webhook Rule"],
+    )
+    timestamp: str | None = Field(
+        default=None,
+        description="ElastAlert가 전송한 매칭 로그 시각",
+        examples=["2026-05-06T12:00:00Z"],
+    )
+    log_message: str | None = Field(
+        default=None,
+        description="ElastAlert가 전송한 원본 로그 메시지",
+        examples=["GET /dvwa/vulnerabilities/sqli/?id=1%27+UNION+SELECT..."],
+    )
+
     alert_name: str = Field(
-        default="sql_injection_detected",
         description="알림 규칙 이름",
         examples=["sql_injection_detected"],
     )
     severity: str = Field(
-        default="high",
         description="알림 심각도 (critical / high / medium / low / info)",
         examples=["high"],
     )
     logs: list[LogEntry] = Field(
-        ...,
+        default_factory=list,
         description="분석 대상 로그 목록 (1건 이상)",
-        min_length=1,
     )
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
+                {
+                    "title": "SQL Injection 공격 탐지",
+                    "rule_name": "SQLi Webhook Rule",
+                    "timestamp": "2026-05-06T12:00:00Z",
+                    "log_message": "GET /dvwa/vulnerabilities/sqli/?id=1%27+UNION+SELECT...",
+                },
                 {
                     "alert_name": "sql_injection_detected",
                     "severity": "high",

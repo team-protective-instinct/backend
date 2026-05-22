@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from dependency_injector.wiring import inject, Provide
 from app.services.incident_service import IncidentService
+from app.services.response_plan_service import ResponsePlanService
 from app.core.container import Container
 from app.models.constants import IncidentStatus
 from app.schemas.incident_schema import (
@@ -67,6 +68,9 @@ def get_overview_summary(
 def get_incident_by_idx(
     incident_idx: int,
     incident_service: IncidentService = Depends(Provide[Container.incident_service]),
+    response_plan_service: ResponsePlanService = Depends(
+        Provide[Container.response_plan_service]
+    ),
 ):
     result = incident_service.get_incident_by_idx(incident_idx)
     if result is None:
@@ -75,22 +79,5 @@ def get_incident_by_idx(
             detail="Incident not found",
         )
 
-    return IncidentDetailResponse.from_incident(result)
-
-
-@router.post("/{incident_idx}/approve")
-@inject
-def approve_incident(
-    incident_idx: int,
-    incident_service: IncidentService = Depends(Provide[Container.incident_service]),
-):
-    return incident_service.approve_incident(incident_idx)
-
-
-@router.post("/{incident_idx}/deny")
-@inject
-def deny_incident(
-    incident_idx: int,
-    incident_service: IncidentService = Depends(Provide[Container.incident_service]),
-):
-    return incident_service.deny_incident(incident_idx)
+    response_plan = response_plan_service.get_by_incident(incident_idx)
+    return IncidentDetailResponse.from_incident(result, response_plan=response_plan)
