@@ -7,8 +7,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.core.llm import get_llm
 from app.schemas import ResponsePlanDraft
 
-from .prompt import GENERATE_RESPONSE_PLAN_REQUEST, PLAYBOOK_AGENT_SYSTEM_PROMPT
-from .state import PlaybookState
+from .prompt import GENERATE_RESPONSE_PLAN_REQUEST, RESPONSE_PLAN_AGENT_SYSTEM_PROMPT
+from .state import ResponsePlanState
 
 
 @lru_cache(maxsize=1)
@@ -17,7 +17,7 @@ def _get_llm_resources():
     return {"response_plan_llm": llm.with_structured_output(ResponsePlanDraft)}
 
 
-def generate_response_plan(state: PlaybookState):
+def generate_response_plan(state: ResponsePlanState):
     resources = _get_llm_resources()
     user_prompt = HumanMessage(
         content=(
@@ -31,7 +31,7 @@ def generate_response_plan(state: PlaybookState):
     draft = cast(
         ResponsePlanDraft,
         resources["response_plan_llm"].invoke(
-            [SystemMessage(content=PLAYBOOK_AGENT_SYSTEM_PROMPT), user_prompt]
+            [SystemMessage(content=RESPONSE_PLAN_AGENT_SYSTEM_PROMPT), user_prompt]
         ),
     )
     return {"response_plan": draft}

@@ -1,4 +1,4 @@
-PLAYBOOK_AGENT_SYSTEM_PROMPT = """You are a senior cyber incident response planner.
+RESPONSE_PLAN_AGENT_SYSTEM_PROMPT = """You are a senior cyber incident response planner.
 
 Your job is to generate a practical response procedure for a confirmed security incident.
 

@@ -1,5 +1,5 @@
 from enum import Enum
 
 
-class PlaybookNodeName(str, Enum):
+class ResponsePlanNodeName(str, Enum):
     GENERATE_PLAN = "generate_plan"
