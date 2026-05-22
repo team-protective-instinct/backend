@@ -12,6 +12,7 @@ from app.models.constants import IncidentStatus
 from app.agents.incident_analyzer.state import AgentState
 from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
+from app.services.playbook_service import PlaybookService
 from datetime import datetime
 
 
@@ -20,10 +21,14 @@ logger = logging.getLogger(__name__)
 
 class IncidentService:
     def __init__(
-        self, session_factory: Callable[..., Session], threat_agent: ThreatAnalyzerAgent
+        self,
+        session_factory: Callable[..., Session],
+        threat_agent: ThreatAnalyzerAgent,
+        playbook_service: PlaybookService,
     ):
         self.session_factory: Callable[..., Session] = session_factory
         self.threat_agent: ThreatAnalyzerAgent = threat_agent
+        self.playbook_service: PlaybookService = playbook_service
 
     def create_incident_from_analysis(
         self,
@@ -160,16 +165,6 @@ class IncidentService:
                 recent_pending=recent_pending,
             )
 
-    def approve_incident(self, incident_idx: int) -> None:
-        # TODO: Implement approve logic
-        _ = incident_idx
-        pass
-
-    def deny_incident(self, incident_idx: int) -> None:
-        # TODO: Implement deny logic
-        _ = incident_idx
-        pass
-
     def incident_analysis(self, log_text: str):
         """
         Run threat analysis and return the result (State).
@@ -232,9 +227,10 @@ class IncidentService:
 
         logger.info("Storing analysis results in the database...")
 
+        created_incident_idx: int | None = None
         with self.session_factory() as db:
             try:
-                _ = self.create_incident_from_analysis(
+                incident = self.create_incident_from_analysis(
                     db=db,
                     title=f"Auto Log Analysis - {thread_id[:8]}",
                     raw_log=log_text,
@@ -247,9 +243,19 @@ class IncidentService:
                     attacker_ip=attacker_ip,
                     analysis_summary=analysis_summary,
                 )
+                created_incident_idx = incident.idx
                 logger.info(f"DB Storage Completed (Thread ID: {thread_id})")
             except Exception as e:
                 logger.error(f"DB Storage Error: {e}")
+
+        if is_threat and created_incident_idx is not None:
+            try:
+                self.playbook_service.create_for_incident(created_incident_idx)
+            except Exception:
+                logger.exception(
+                    "Response plan generation failed - incident_idx=%s",
+                    created_incident_idx,
+                )
 
         result_state: dict[str, object] = dict(final_state)
         result_state["thread_id"] = thread_id
