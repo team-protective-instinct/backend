@@ -34,7 +34,23 @@ def _logs_to_text(logs: list[LogEntry]) -> str:
     return "\n\n".join(parts)
 
 
-def _run_analysis_background(alert_name: str, log_text: str, incident_service: IncidentService):
+def _elastalert_to_text(request: WebhookAlertRequest) -> str:
+    """ElastAlert 기본 webhook payload를 에이전트 분석용 텍스트로 변환합니다."""
+    return (
+        "[ElastAlert]\n"
+        f"  Title      : {request.title or 'N/A'}\n"
+        f"  Rule Name  : {request.rule_name or 'N/A'}\n"
+        f"  Alert Name : {request.alert_name}\n"
+        f"  Time       : {request.timestamp or 'N/A'}\n"
+        f"  Severity   : {request.severity}\n"
+        "  Raw Log    :\n"
+        f"{request.log_message or 'N/A'}"
+    )
+
+
+def _run_analysis_background(
+    alert_name: str, log_text: str, incident_service: IncidentService
+):
     """백그라운드에서 위협 분석을 실행합니다 (비동기 엔드포인트용)."""
     print("\n" + "=" * 50)
     print(f"🚨 [Webhook] 알림 '{alert_name}' 접수 - 백그라운드 분석 시작")
@@ -48,7 +64,7 @@ def _run_analysis_background(alert_name: str, log_text: str, incident_service: I
 
 
 @router.post(
-    "/",
+    "",
     status_code=HTTPStatus.ACCEPTED,
     summary="알림 접수 (비동기)",
     description=(
@@ -61,7 +77,15 @@ def _run_analysis_background(alert_name: str, log_text: str, incident_service: I
 async def webhook_receive(
     request: WebhookAlertRequest,
     background_tasks: BackgroundTasks,
-    incident_service: IncidentService = Depends(Provide[Container.incident_service])
+    incident_service: IncidentService = Depends(Provide[Container.incident_service]),
 ):
-    log_text = _logs_to_text(request.logs)
-    background_tasks.add_task(_run_analysis_background, request.alert_name, log_text, incident_service)
+    alert_name = request.rule_name or request.alert_name
+    log_text = _logs_to_text(request.logs) if request.logs else _elastalert_to_text(request)
+    background_tasks.add_task(
+        _run_analysis_background, alert_name, log_text, incident_service
+    )
+    return {
+        "status": "accepted",
+        "alert_name": alert_name,
+        "log_count": len(request.logs) if request.logs else 1,
+    }
