@@ -1,14 +1,16 @@
 from collections.abc import Iterable
 
-from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from pydantic import SecretStr
 
 from app.core.config import settings
 from app.schemas import PlaybookChunk, PlaybookIndexError
 
 
-DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
+DEFAULT_EMBEDDING_MODEL = settings.RAG_EMBEDDING_MODEL
 DEFAULT_EMBEDDING_DIMENSIONS = 1536
+DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT"
+QUERY_TASK_TYPE = "RETRIEVAL_QUERY"
 
 
 def embed_chunks(
@@ -19,7 +21,13 @@ def embed_chunks(
     embedder = create_embedder(model)
     embeddings: list[list[float]] = []
     for batch in iter_batches(chunks, batch_size):
-        embeddings.extend(embedder.embed_documents([chunk.content for chunk in batch]))
+        embeddings.extend(
+            embedder.embed_documents(
+                [chunk.content for chunk in batch],
+                task_type=DOCUMENT_TASK_TYPE,
+                output_dimensionality=DEFAULT_EMBEDDING_DIMENSIONS,
+            )
+        )
     return embeddings
 
 
@@ -27,15 +35,23 @@ def embed_query(query: str, model: str = DEFAULT_EMBEDDING_MODEL) -> list[float]
     stripped_query = query.strip()
     if not stripped_query:
         raise PlaybookIndexError("Query text is required for playbook retrieval")
-    return create_embedder(model).embed_query(stripped_query)
+    return create_embedder(model).embed_query(
+        stripped_query,
+        task_type=QUERY_TASK_TYPE,
+        output_dimensionality=DEFAULT_EMBEDDING_DIMENSIONS,
+    )
 
 
-def create_embedder(model: str) -> OpenAIEmbeddings:
-    if settings.OPENAI_API_KEY is None or not settings.OPENAI_API_KEY.strip():
+def create_embedder(model: str) -> GoogleGenerativeAIEmbeddings:
+    if settings.GOOGLE_API_KEY is None or not settings.GOOGLE_API_KEY.strip():
         raise PlaybookIndexError(
-            "OPENAI_API_KEY is required for playbook embedding generation"
+            "GOOGLE_API_KEY is required for playbook embedding generation"
         )
-    return OpenAIEmbeddings(model=model, api_key=SecretStr(settings.OPENAI_API_KEY))
+    return GoogleGenerativeAIEmbeddings(
+        model=model,
+        api_key=SecretStr(settings.GOOGLE_API_KEY),
+        output_dimensionality=DEFAULT_EMBEDDING_DIMENSIONS,
+    )
 
 
 def iter_batches(
