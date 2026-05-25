@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str | None = Field(default=None)
     ANTHROPIC_API_KEY: str | None = Field(default=None)
     OPENAI_API_KEY: str | None = Field(default=None)
+    RAG_EMBEDDING_MODEL: str = Field(default="gemini-embedding-001")
 
     SECRET_KEY: str = Field(default=...)
     ALGORITHM: str = Field(default="HS256")
