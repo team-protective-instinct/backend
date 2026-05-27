@@ -1,34 +1,162 @@
-import json
 import logging
-import uuid
+from datetime import datetime
 from math import ceil
-from typing import Callable, cast
-from langchain_core.messages import HumanMessage
+from typing import Callable
+
 from sqlalchemy import String, cast as sql_cast, func, or_
 from sqlalchemy.orm import Session
+
 from app.dtos import IncidentListResult, IncidentSummaryResult
 from app.models import Incident
-from app.models.constants import IncidentStatus
-from app.agents.incident_analyzer.state import AgentState
-from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
-from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
-from app.services.response_plan_service import ResponsePlanService
-from datetime import datetime
+from app.models.constants import (
+    IncidentAnalysisStatus,
+    IncidentResponsePlanStatus,
+    IncidentStatus,
+)
+from app.schemas import AnalysisReport
 
 
 logger = logging.getLogger(__name__)
 
 
 class IncidentService:
-    def __init__(
-        self,
-        session_factory: Callable[..., Session],
-        threat_agent: ThreatAnalyzerAgent,
-        response_plan_service: ResponsePlanService,
-    ):
+    def __init__(self, session_factory: Callable[..., Session]):
         self.session_factory: Callable[..., Session] = session_factory
-        self.threat_agent: ThreatAnalyzerAgent = threat_agent
-        self.response_plan_service: ResponsePlanService = response_plan_service
+
+    def create_from_webhook(
+        self,
+        title: str,
+        severity: str | None,
+        evidence_logs: str,
+        raw_payload: dict[str, object],
+    ) -> Incident:
+        incident = Incident(
+            thread_id=None,
+            title=title,
+            status=IncidentStatus.ANALYZING.value,
+            evidence_logs=evidence_logs,
+            raw_payload=raw_payload,
+            severity=severity,
+            analysis_status=IncidentAnalysisStatus.PENDING.value,
+            analysis_attempts=0,
+            analysis_last_error=None,
+            response_plan_status=None,
+            response_plan_attempts=0,
+            response_plan_last_error=None,
+        )
+        with self.session_factory() as db:
+            db.add(incident)
+            db.commit()
+            db.refresh(incident)
+            return incident
+
+    def claim_pending_analysis_batch(self, limit: int = 5) -> list[Incident]:
+        with self.session_factory() as db:
+            incidents = (
+                db.query(Incident)
+                .filter(
+                    Incident.analysis_status == IncidentAnalysisStatus.PENDING.value
+                )
+                .order_by(Incident.created_at.asc())
+                .with_for_update(skip_locked=True)
+                .limit(limit)
+                .all()
+            )
+            for incident in incidents:
+                incident.analysis_status = IncidentAnalysisStatus.PROCESSING.value
+                incident.analysis_attempts += 1
+                incident.analysis_last_error = None
+            db.commit()
+            for incident in incidents:
+                db.refresh(incident)
+            return incidents
+
+    def mark_analysis_succeeded(
+        self,
+        incident_idx: int,
+        thread_id: str,
+        analysis: AnalysisReport,
+    ) -> Incident:
+        with self.session_factory() as db:
+            incident = self._get_incident_or_raise(db, incident_idx)
+            incident.thread_id = thread_id
+            incident.analysis_result = analysis.model_dump()
+            incident.is_identified_threat = analysis.is_true_positive
+            incident.severity = analysis.severity
+            incident.attack_type = analysis.attack_type
+            incident.confidence_score = analysis.confidence_score
+            incident.attacker_ip = analysis.attack_ip
+            incident.analysis_summary = analysis.analysis_summary
+            incident.analysis_last_error = None
+
+            if analysis.is_true_positive:
+                incident.status = IncidentStatus.PENDING_REVIEW.value
+                incident.analysis_status = IncidentAnalysisStatus.COMPLETED.value
+                incident.response_plan_status = IncidentResponsePlanStatus.PENDING.value
+                incident.response_plan_last_error = None
+            else:
+                incident.status = IncidentStatus.RESOLVED.value
+                incident.analysis_status = IncidentAnalysisStatus.COMPLETED.value
+                incident.response_plan_status = None
+
+            db.commit()
+            db.refresh(incident)
+            return incident
+
+    def mark_analysis_failed(self, incident_idx: int, error: Exception) -> None:
+        with self.session_factory() as db:
+            incident = self._get_incident_or_raise(db, incident_idx)
+            incident.analysis_status = (
+                IncidentAnalysisStatus.FAILED.value
+                if incident.analysis_attempts >= 3
+                else IncidentAnalysisStatus.PENDING.value
+            )
+            incident.analysis_last_error = str(error)
+            db.commit()
+
+    def claim_pending_response_plan_batch(self, limit: int = 5) -> list[Incident]:
+        with self.session_factory() as db:
+            incidents = (
+                db.query(Incident)
+                .filter(
+                    Incident.analysis_status == IncidentAnalysisStatus.COMPLETED.value,
+                    Incident.is_identified_threat.is_(True),
+                    Incident.response_plan_status
+                    == IncidentResponsePlanStatus.PENDING.value,
+                )
+                .order_by(Incident.modified_at.asc())
+                .with_for_update(skip_locked=True)
+                .limit(limit)
+                .all()
+            )
+            for incident in incidents:
+                incident.response_plan_status = (
+                    IncidentResponsePlanStatus.PROCESSING.value
+                )
+                incident.response_plan_attempts += 1
+                incident.response_plan_last_error = None
+            db.commit()
+            for incident in incidents:
+                db.refresh(incident)
+            return incidents
+
+    def mark_response_plan_succeeded(self, incident_idx: int) -> None:
+        with self.session_factory() as db:
+            incident = self._get_incident_or_raise(db, incident_idx)
+            incident.response_plan_status = IncidentResponsePlanStatus.COMPLETED.value
+            incident.response_plan_last_error = None
+            db.commit()
+
+    def mark_response_plan_failed(self, incident_idx: int, error: Exception) -> None:
+        with self.session_factory() as db:
+            incident = self._get_incident_or_raise(db, incident_idx)
+            incident.response_plan_status = (
+                IncidentResponsePlanStatus.FAILED.value
+                if incident.response_plan_attempts >= 3
+                else IncidentResponsePlanStatus.PENDING.value
+            )
+            incident.response_plan_last_error = str(error)
+            db.commit()
 
     def create_incident_from_analysis(
         self,
@@ -47,9 +175,9 @@ class IncidentService:
         incident = Incident(
             thread_id=thread_id,
             title=title,
-            status=IncidentStatus.PENDING_REVIEW
+            status=IncidentStatus.PENDING_REVIEW.value
             if is_threat
-            else IncidentStatus.RESOLVED,
+            else IncidentStatus.RESOLVED.value,
             evidence_logs=raw_log,
             analysis_result=analysis_data,
             is_identified_threat=is_threat,
@@ -58,6 +186,10 @@ class IncidentService:
             confidence_score=confidence_score,
             attacker_ip=attacker_ip,
             analysis_summary=analysis_summary,
+            analysis_status=IncidentAnalysisStatus.COMPLETED.value,
+            response_plan_status=IncidentResponsePlanStatus.PENDING.value
+            if is_threat
+            else None,
         )
         db.add(incident)
         db.commit()
@@ -68,7 +200,7 @@ class IncidentService:
         with self.session_factory() as db:
             incidents = (
                 db.query(Incident)
-                .filter(Incident.status == IncidentStatus.PENDING_REVIEW)
+                .filter(Incident.status == IncidentStatus.PENDING_REVIEW.value)
                 .all()
             )
             return incidents
@@ -131,7 +263,7 @@ class IncidentService:
 
             pending_count = (
                 db.query(func.count(Incident.idx))
-                .filter(Incident.status == IncidentStatus.PENDING_REVIEW)
+                .filter(Incident.status == IncidentStatus.PENDING_REVIEW.value)
                 .scalar()
                 or 0
             )
@@ -145,14 +277,14 @@ class IncidentService:
 
             resolved_count = (
                 db.query(func.count(Incident.idx))
-                .filter(Incident.status == IncidentStatus.RESOLVED)
+                .filter(Incident.status == IncidentStatus.RESOLVED.value)
                 .scalar()
                 or 0
             )
 
             recent_pending = (
                 db.query(Incident)
-                .filter(Incident.status == IncidentStatus.PENDING_REVIEW)
+                .filter(Incident.status == IncidentStatus.PENDING_REVIEW.value)
                 .order_by(Incident.created_at.desc())
                 .limit(5)
                 .all()
@@ -165,98 +297,8 @@ class IncidentService:
                 recent_pending=recent_pending,
             )
 
-    def incident_analysis(self, log_text: str):
-        """
-        Run threat analysis and return the result (State).
-        Automatically records the results in the database with a thread_id.
-        """
-        thread_id = str(uuid.uuid4())
-
-        initial_state: AgentState = {
-            "messages": [
-                HumanMessage(content=f"{LOG_ANALYSIS_REQUEST_PREFIX}{log_text}")
-            ],
-            "context": {"source": "log_analytics_service"},
-        }
-
-        logger.info(f"[Starting Threat Analysis - Thread ID: {thread_id}]")
-
-        # Use invoke to get the final state
-        final_state = cast(
-            AgentState,
-            self.threat_agent.invoke(
-                initial_state, config={"configurable": {"thread_id": thread_id}}
-            ),
-        )
-
-        analysis_dict: dict[str, object] | None = None
-        is_threat = False
-        severity = None
-        attack_type = None
-        confidence_score = None
-        attacker_ip = None
-        analysis_summary = None
-
-        if "analysis_result" in final_state:
-            analysis = final_state["analysis_result"]
-            analysis_dict = cast(dict[str, object], analysis.model_dump())
-            is_threat = analysis.is_true_positive
-            severity = analysis.severity
-            attack_type = analysis.attack_type
-            confidence_score = analysis.confidence_score
-            attacker_ip = analysis.attack_ip
-            analysis_summary = analysis.analysis_summary
-
-            logger.info("[Threat Analysis Completed]")
-            logger.info(
-                f" - Verdict: {'True Positive' if is_threat else 'False Positive'}"
-            )
-            logger.info(f" - Severity: {severity}")
-            logger.info(f" - Confidence Score: {confidence_score}")
-            logger.info(f" - Attack Type: {attack_type}")
-            logger.info(f" - Primary Attacker IP: {attacker_ip}")
-            logger.info(f" - Summary: {analysis.analysis_summary}")
-
-            logger.debug(
-                json.dumps(
-                    analysis_dict,
-                    ensure_ascii=False,
-                    indent=2,
-                )
-            )
-
-        logger.info("Storing analysis results in the database...")
-
-        created_incident_idx: int | None = None
-        with self.session_factory() as db:
-            try:
-                incident = self.create_incident_from_analysis(
-                    db=db,
-                    title=f"Auto Log Analysis - {thread_id[:8]}",
-                    raw_log=log_text,
-                    analysis_data=analysis_dict,
-                    is_threat=is_threat,
-                    thread_id=thread_id,
-                    severity=severity,
-                    attack_type=attack_type,
-                    confidence_score=confidence_score,
-                    attacker_ip=attacker_ip,
-                    analysis_summary=analysis_summary,
-                )
-                created_incident_idx = incident.idx
-                logger.info(f"DB Storage Completed (Thread ID: {thread_id})")
-            except Exception as e:
-                logger.error(f"DB Storage Error: {e}")
-
-        if is_threat and created_incident_idx is not None:
-            try:
-                self.response_plan_service.create_for_incident(created_incident_idx)
-            except Exception:
-                logger.exception(
-                    "Response plan generation failed - incident_idx=%s",
-                    created_incident_idx,
-                )
-
-        result_state: dict[str, object] = dict(final_state)
-        result_state["thread_id"] = thread_id
-        return result_state
+    def _get_incident_or_raise(self, db: Session, incident_idx: int) -> Incident:
+        incident = db.query(Incident).filter(Incident.idx == incident_idx).first()
+        if incident is None:
+            raise ValueError("Incident not found")
+        return incident

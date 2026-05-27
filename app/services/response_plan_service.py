@@ -1,33 +1,27 @@
 import logging
-import uuid
 from datetime import datetime
-from typing import Callable, cast
+from typing import Callable
 
 from sqlalchemy.orm import Session
 
-from app.agents.response_plan_agent.agent import ResponsePlanAgent
-from app.agents.response_plan_agent.state import ResponsePlanState
 from app.models import Incident, ResponsePlan
 from app.models.constants import ResponsePlanStatus
 from app.schemas import ResponsePlanDraft
-from app.services.playbook_service import PlaybookService
 
 
 logger = logging.getLogger(__name__)
 
 
 class ResponsePlanService:
-    def __init__(
-        self,
-        session_factory: Callable[..., Session],
-        response_plan_agent: ResponsePlanAgent,
-        playbook_service: PlaybookService,
-    ):
+    def __init__(self, session_factory: Callable[..., Session]):
         self.session_factory: Callable[..., Session] = session_factory
-        self.response_plan_agent: ResponsePlanAgent = response_plan_agent
-        self.playbook_service: PlaybookService = playbook_service
 
-    def create_for_incident(self, incident_idx: int) -> ResponsePlan:
+    def create_from_draft(
+        self,
+        incident_idx: int,
+        thread_id: str,
+        draft: ResponsePlanDraft,
+    ) -> ResponsePlan:
         with self.session_factory() as db:
             incident = db.query(Incident).filter(Incident.idx == incident_idx).first()
             if incident is None:
@@ -37,34 +31,6 @@ class ResponsePlanService:
             if existing is not None:
                 return existing
 
-            query = self._build_retrieval_query(incident)
-            context = self._build_agent_context(incident)
-
-        retrieved_chunks = self.playbook_service.retrieve_relevant_chunks(
-            query=query,
-            limit=5,
-        )
-
-        thread_id = f"response-plan:{incident_idx}:{uuid.uuid4()}"
-        initial_state: ResponsePlanState = {
-            "context": context,
-            "retrieved_chunks": [
-                self.playbook_service.retrieval_result_to_dict(chunk)
-                for chunk in retrieved_chunks
-            ],
-        }
-        final_state = cast(
-            ResponsePlanState,
-            self.response_plan_agent.invoke(
-                initial_state,
-                config={"configurable": {"thread_id": thread_id}},
-            ),
-        )
-        draft = final_state.get("response_plan")
-        if draft is None:
-            raise RuntimeError("ResponsePlanAgent did not generate a response plan")
-
-        with self.session_factory() as db:
             response_plan = self._create_response_plan(
                 db=db,
                 incident_idx=incident_idx,
@@ -160,39 +126,3 @@ class ResponsePlanService:
         if response_plan is None:
             raise ValueError("Response plan not found")
         return response_plan
-
-    def _build_retrieval_query(self, incident: Incident) -> str:
-        context = self._build_agent_context(incident)
-        parts = [
-            str(context.get("attack_type") or ""),
-            str(context.get("severity") or ""),
-            str(context.get("analysis_summary") or ""),
-            " ".join(cast(list[str], context.get("target_uris") or [])),
-            " ".join(cast(list[str], context.get("suspicious_payloads") or [])),
-            str(context.get("raw_log") or ""),
-        ]
-        return "\n".join(part for part in parts if part.strip())
-
-    def _build_agent_context(self, incident: Incident) -> dict[str, object]:
-        analysis = incident.analysis_result if isinstance(incident.analysis_result, dict) else {}
-        raw_log = incident.evidence_logs or ""
-        return {
-            "incident_idx": incident.idx,
-            "title": incident.title,
-            "severity": incident.severity,
-            "attack_type": incident.attack_type,
-            "confidence_score": incident.confidence_score,
-            "attacker_ip": incident.attacker_ip,
-            "analysis_summary": incident.analysis_summary,
-            "analysis_result": analysis,
-            "target_uris": self._get_string_list(analysis, "target_uris"),
-            "suspicious_payloads": self._get_string_list(analysis, "suspicious_payloads"),
-            "raw_log": raw_log[:6000],
-            "created_at": incident.created_at.isoformat(),
-        }
-
-    def _get_string_list(self, data: dict[str, object], key: str) -> list[str]:
-        value = data.get(key)
-        if not isinstance(value, list):
-            return []
-        return [str(item) for item in value]
