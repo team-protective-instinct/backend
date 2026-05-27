@@ -7,26 +7,31 @@ class LogEntry(BaseModel):
 
     timestamp: str = Field(
         ...,
+        max_length=128,
         description="로그 발생 시각 (ISO-8601 / 자유 형식)",
         examples=["2026-04-14T10:23:45+09:00"],
     )
     source_ip: str = Field(
         ...,
+        max_length=45,
         description="요청 발신 IP 주소",
         examples=["103.22.1.5"],
     )
     method: str = Field(
         ...,
+        max_length=16,
         description="HTTP 메서드",
         examples=["GET"],
     )
     uri: str = Field(
         ...,
+        max_length=2048,
         description="요청 URI (쿼리스트링 포함)",
         examples=["/login.php?user=admin' OR 1=1 --"],
     )
     user_agent: str = Field(
         default="",
+        max_length=512,
         description="User-Agent 헤더",
         examples=["Mozilla/5.0"],
     )
@@ -37,16 +42,19 @@ class LogEntry(BaseModel):
     )
     body: str | None = Field(
         default=None,
+        max_length=4096,
         description="요청 바디 (POST 데이터 등)",
         examples=["username=admin&password=1234"],
     )
     rule_id: str | None = Field(
         default=None,
+        max_length=128,
         description="WAF/IDS 룰 ID (탐지 룰이 있는 경우)",
         examples=["942100"],
     )
     rule_message: str | None = Field(
         default=None,
+        max_length=1024,
         description="WAF/IDS 룰 설명 메시지",
         examples=["SQL Injection Attack Detected"],
     )
@@ -88,35 +96,42 @@ class WebhookAlertRequest(BaseModel):
 
     title: str | None = Field(
         default=None,
+        max_length=255,
         description="ElastAlert가 전송한 알림 제목",
         examples=["SQL Injection 공격 탐지"],
     )
     rule_name: str | None = Field(
         default=None,
+        max_length=255,
         description="ElastAlert 룰 이름",
         examples=["SQLi Webhook Rule"],
     )
     timestamp: str | None = Field(
         default=None,
+        max_length=128,
         description="ElastAlert가 전송한 매칭 로그 시각",
         examples=["2026-05-06T12:00:00Z"],
     )
     log_message: str | None = Field(
         default=None,
+        max_length=12000,
         description="ElastAlert가 전송한 원본 로그 메시지",
         examples=["GET /dvwa/vulnerabilities/sqli/?id=1%27+UNION+SELECT..."],
     )
 
     alert_name: str = Field(
+        max_length=255,
         description="알림 규칙 이름",
         examples=["sql_injection_detected"],
     )
     severity: str = Field(
+        max_length=20,
         description="알림 심각도 (critical / high / medium / low / info)",
         examples=["high"],
     )
     logs: list[LogEntry] = Field(
         default_factory=list,
+        max_length=20,
         description="분석 대상 로그 목록 (1건 이상)",
     )
 
