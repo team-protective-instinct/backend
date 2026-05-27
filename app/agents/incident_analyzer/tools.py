@@ -22,7 +22,7 @@ def check_ip_reputation(ip_address: str) -> str:
 @tool
 def analyze_payload(payload: str) -> str:
     """Analyze the HTTP request payload (URI, Body, etc.) to check for attack signatures."""
-    logger.info(f"[Tool Execution] Analyzing payload... ({payload})")
+    logger.info("[Tool Execution] Analyzing payload... length=%s", len(payload))
 
     payload_upper = payload.upper()
     if "UNION SELECT" in payload_upper or "OR 1=1" in payload_upper:

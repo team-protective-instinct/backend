@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, Depends
 from dependency_injector.wiring import inject, Provide
 from app.services.incident_service import IncidentService
 from app.core.container import Container
@@ -12,6 +12,14 @@ from http import HTTPStatus
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["Webhook - 로그 기반 위협 분석"])
+
+MAX_STORED_TEXT_CHARS = 12000
+
+
+def _truncate(value: str, max_length: int) -> str:
+    if len(value) <= max_length:
+        return value
+    return f"{value[:max_length]}...[truncated {len(value) - max_length} chars]"
 
 
 def _logs_to_text(logs: list[LogEntry]) -> str:
@@ -31,7 +39,7 @@ def _logs_to_text(logs: list[LogEntry]) -> str:
             f"  Rule Msg   : {log.rule_message or 'N/A'}"
         )
         parts.append(entry)
-    return "\n\n".join(parts)
+    return _truncate("\n\n".join(parts), MAX_STORED_TEXT_CHARS)
 
 
 def _elastalert_to_text(request: WebhookAlertRequest) -> str:
@@ -48,44 +56,33 @@ def _elastalert_to_text(request: WebhookAlertRequest) -> str:
     )
 
 
-def _run_analysis_background(
-    alert_name: str, log_text: str, incident_service: IncidentService
-):
-    """백그라운드에서 위협 분석을 실행합니다 (비동기 엔드포인트용)."""
-    print("\n" + "=" * 50)
-    print(f"🚨 [Webhook] 알림 '{alert_name}' 접수 - 백그라운드 분석 시작")
-    print("=" * 50)
-
-    try:
-        incident_service.incident_analysis(log_text)
-        logger.info(f"백그라운드 분석 완료 - alert={alert_name}")
-    except Exception:
-        logger.exception(f"위협 분석 중 오류 발생 - alert={alert_name}")
-
-
 @router.post(
     "",
     status_code=HTTPStatus.ACCEPTED,
-    summary="알림 접수 (비동기)",
+    summary="알림 접수",
     description=(
         "ElastAlert2 / ModSecurity 등 외부 시스템에서 로그 알림을 수신합니다.\n\n"
-        "로그를 접수한 뒤 **백그라운드**에서 threat_analyzer_agent 를 실행하고,\n"
-        "즉시 접수 확인 응답을 반환합니다."
+        "로그를 incidents 테이블에 저장하고, 별도 worker 가 threat_analyzer_agent 를 실행합니다."
     ),
 )
 @inject
 async def webhook_receive(
     request: WebhookAlertRequest,
-    background_tasks: BackgroundTasks,
     incident_service: IncidentService = Depends(Provide[Container.incident_service]),
 ):
     alert_name = request.rule_name or request.alert_name
     log_text = _logs_to_text(request.logs) if request.logs else _elastalert_to_text(request)
-    background_tasks.add_task(
-        _run_analysis_background, alert_name, log_text, incident_service
+    log_text = _truncate(log_text, MAX_STORED_TEXT_CHARS)
+    incident = incident_service.create_from_webhook(
+        title=f"[Webhook] {alert_name}",
+        severity=request.severity,
+        evidence_logs=log_text,
+        raw_payload=request.model_dump(mode="json"),
     )
+    logger.info("Webhook incident queued - incident_idx=%s alert=%s", incident.idx, alert_name)
     return {
         "status": "accepted",
         "alert_name": alert_name,
+        "incident_idx": incident.idx,
         "log_count": len(request.logs) if request.logs else 1,
     }

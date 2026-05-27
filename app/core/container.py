@@ -10,6 +10,7 @@ from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
 from app.agents.response_plan_agent.agent import ResponsePlanAgent
 from app.services.playbook_service import PlaybookService
 from app.services.response_plan_service import ResponsePlanService
+from app.services.ai_invoker_service import AiInvokerService
 
 
 class Container(containers.DeclarativeContainer):
@@ -47,6 +48,11 @@ class Container(containers.DeclarativeContainer):
     response_plan_service = providers.Factory(
         ResponsePlanService,
         session_factory=db.provided.session,
+    )
+
+    ai_invoker_service = providers.Factory(
+        AiInvokerService,
+        threat_agent=threat_agent,
         response_plan_agent=response_plan_agent,
         playbook_service=playbook_service,
     )
@@ -60,6 +66,4 @@ class Container(containers.DeclarativeContainer):
     incident_service = providers.Factory(
         IncidentService,
         session_factory=db.provided.session,
-        threat_agent=threat_agent,
-        response_plan_service=response_plan_service,
     )
