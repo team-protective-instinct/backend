@@ -84,3 +84,25 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
 ```
 
 서버가 실행되면, 브라우저를 열고 FastAPI의 자동 생성 API 문서 메인 화면인 [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) 에 접속하여 제대로 실행되었는지 확인합니다.
+
+### 7. AI Worker 실행
+
+웹훅으로 수신된 알림은 먼저 `incidents` 테이블에 저장되고, AI 분석은 별도 worker 프로세스에서 처리됩니다.
+
+#### Incident Agent Worker
+
+의심 로그를 분석해 정오탐을 판별합니다.
+
+```bash
+uv run python -m app.workers.incident_agent_worker
+```
+
+#### Response Plan Agent Worker
+
+정탐으로 판별된 incident에 대해 대응 계획서를 생성합니다.
+
+```bash
+uv run python -m app.workers.response_plan_agent_worker
+```
+
+로컬 개발 시에는 API 서버와 두 worker를 각각 별도 터미널에서 실행합니다.
