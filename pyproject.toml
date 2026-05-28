@@ -13,8 +13,6 @@ dependencies = [
   "langgraph>=0.0.21",
   "langchain-google-genai>=0.0.9",
   "psycopg2-binary>=2.9.11",
-  "pyjwt>=2.12.1",
-  "bcrypt==4.3.0",
   "langgraph-checkpoint-postgres>=3.0.5",
   "psycopg>=3.3.3",
   "psycopg-pool>=3.3.0",
