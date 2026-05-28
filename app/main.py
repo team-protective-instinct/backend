@@ -2,6 +2,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.container import Container
+from app.core.exception_handlers import register_exception_handlers
 from app.controllers import (
     webhook_controller,
     user_controller,
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI()
     app.state.container = container
+    register_exception_handlers(app)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
