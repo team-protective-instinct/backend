@@ -87,7 +87,7 @@ uv run alembic downgrade -1
 현재 `migrations/env.py`에는 모델 import가 명시되어 있습니다.
 
 ```python
-from app.models import Incident, User, VictimSystem
+from app.models import Incident, RagPlaybook, RagPlaybookChunk, ResponsePlan, VictimSystem
 ```
 
 새 모델을 추가했는데 마이그레이션 자동 생성에 잡히지 않는다면, 먼저 `app/models/__init__.py`와 `migrations/env.py`의 import 상태를 확인합니다.
