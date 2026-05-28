@@ -4,6 +4,7 @@ import time
 from app.core.container import Container
 from app.services.ai_invoker_service import AiInvokerService
 from app.services.incident_service import IncidentService
+from app.services.incident_raw_log_service import IncidentRawLogService
 
 
 logging.basicConfig(
@@ -18,11 +19,13 @@ class IncidentAgentWorker:
     def __init__(
         self,
         incident_service: IncidentService,
+        raw_log_service: IncidentRawLogService,
         ai_invoker_service: AiInvokerService,
         batch_size: int = 5,
         poll_interval_seconds: int = 5,
     ):
         self.incident_service = incident_service
+        self.raw_log_service = raw_log_service
         self.ai_invoker_service = ai_invoker_service
         self.batch_size = batch_size
         self.poll_interval_seconds = poll_interval_seconds
@@ -45,8 +48,11 @@ class IncidentAgentWorker:
         )
         for incident in incidents:
             try:
+                raw_log = self.raw_log_service.get_latest_by_incident(incident.idx)
+                if raw_log is None:
+                    raise RuntimeError("Incident raw log not found")
                 thread_id, analysis = self.ai_invoker_service.generate_incident_reports(
-                    incident.evidence_logs or ""
+                    raw_log.evidence_logs
                 )
                 self.incident_service.mark_analysis_succeeded(
                     incident_idx=incident.idx,
@@ -65,6 +71,7 @@ def main() -> None:
     container.db().create_database()
     worker = IncidentAgentWorker(
         incident_service=container.incident_service(),
+        raw_log_service=container.incident_raw_log_service(),
         ai_invoker_service=container.ai_invoker_service(),
     )
     worker.run_forever()

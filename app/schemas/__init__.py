@@ -6,7 +6,6 @@ from .agent_schema import (
 from .webhook_schema import LogEntry, WebhookAlertRequest
 from .incident_schema import (
     IncidentDetailResponse,
-    IncidentIOCsResponse,
     IncidentKeyIndicatorResponse,
     IncidentListItemResponse,
     IncidentListResponse,
@@ -33,7 +32,6 @@ __all__ = [
     "LogEntry",
     "WebhookAlertRequest",
     "IncidentDetailResponse",
-    "IncidentIOCsResponse",
     "IncidentKeyIndicatorResponse",
     "IncidentListItemResponse",
     "IncidentListResponse",
