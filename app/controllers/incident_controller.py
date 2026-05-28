@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from dependency_injector.wiring import inject, Provide
 from app.services.incident_service import IncidentService
+from app.services.incident_raw_log_service import IncidentRawLogService
+from app.services.incident_report_service import IncidentReportService
 from app.services.response_plan_service import ResponsePlanService
 from app.core.container import Container
 from app.models.constants import IncidentStatus
@@ -35,8 +37,8 @@ def get_incidents(
     )
     return IncidentListResponse(
         items=[
-            IncidentListItemResponse.from_incident(incident)
-            for incident in result.items
+            IncidentListItemResponse.from_incident(item.incident, item.report)
+            for item in result.items
         ],
         page=result.page,
         limit=result.limit,
@@ -51,7 +53,10 @@ def get_pending_incidents(
     incident_service: IncidentService = Depends(Provide[Container.incident_service]),
 ):
     incidents = incident_service.get_pending_incidents()
-    return [IncidentListItemResponse.from_incident(incident) for incident in incidents]
+    return [
+        IncidentListItemResponse.from_incident(item.incident, item.report)
+        for item in incidents
+    ]
 
 
 @router.get("/summary", response_model=OverviewSummaryResponse)
@@ -68,6 +73,12 @@ def get_overview_summary(
 def get_incident_by_idx(
     incident_idx: int,
     incident_service: IncidentService = Depends(Provide[Container.incident_service]),
+    raw_log_service: IncidentRawLogService = Depends(
+        Provide[Container.incident_raw_log_service]
+    ),
+    report_service: IncidentReportService = Depends(
+        Provide[Container.incident_report_service]
+    ),
     response_plan_service: ResponsePlanService = Depends(
         Provide[Container.response_plan_service]
     ),
@@ -80,4 +91,11 @@ def get_incident_by_idx(
         )
 
     response_plan = response_plan_service.get_by_incident(incident_idx)
-    return IncidentDetailResponse.from_incident(result, response_plan=response_plan)
+    report = report_service.get_latest_by_incident(incident_idx)
+    raw_log = raw_log_service.get_latest_by_incident(incident_idx)
+    return IncidentDetailResponse.from_incident(
+        result,
+        report=report,
+        raw_log=raw_log,
+        response_plan=response_plan,
+    )

@@ -11,6 +11,8 @@ from app.agents.response_plan_agent.agent import ResponsePlanAgent
 from app.services.playbook_service import PlaybookService
 from app.services.response_plan_service import ResponsePlanService
 from app.services.ai_invoker_service import AiInvokerService
+from app.services.incident_raw_log_service import IncidentRawLogService
+from app.services.incident_report_service import IncidentReportService
 
 
 class Container(containers.DeclarativeContainer):
@@ -50,6 +52,16 @@ class Container(containers.DeclarativeContainer):
         session_factory=db.provided.session,
     )
 
+    incident_raw_log_service = providers.Factory(
+        IncidentRawLogService,
+        session_factory=db.provided.session,
+    )
+
+    incident_report_service = providers.Factory(
+        IncidentReportService,
+        session_factory=db.provided.session,
+    )
+
     ai_invoker_service = providers.Factory(
         AiInvokerService,
         threat_agent=threat_agent,
@@ -66,4 +78,6 @@ class Container(containers.DeclarativeContainer):
     incident_service = providers.Factory(
         IncidentService,
         session_factory=db.provided.session,
+        raw_log_service=incident_raw_log_service,
+        report_service=incident_report_service,
     )

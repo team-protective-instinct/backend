@@ -6,22 +6,31 @@ from typing import Callable
 from sqlalchemy import String, cast as sql_cast, func, or_
 from sqlalchemy.orm import Session
 
-from app.dtos import IncidentListResult, IncidentSummaryResult
-from app.models import Incident
+from app.dtos import IncidentListResult, IncidentSummaryResult, IncidentWithReport
+from app.models import Incident, IncidentRawLog, IncidentReport
 from app.models.constants import (
     IncidentAnalysisStatus,
     IncidentResponsePlanStatus,
     IncidentStatus,
 )
 from app.schemas import AnalysisReport
+from app.services.incident_raw_log_service import IncidentRawLogService
+from app.services.incident_report_service import IncidentReportService
 
 
 logger = logging.getLogger(__name__)
 
 
 class IncidentService:
-    def __init__(self, session_factory: Callable[..., Session]):
+    def __init__(
+        self,
+        session_factory: Callable[..., Session],
+        raw_log_service: IncidentRawLogService,
+        report_service: IncidentReportService,
+    ):
         self.session_factory: Callable[..., Session] = session_factory
+        self.raw_log_service = raw_log_service
+        self.report_service = report_service
 
     def create_from_webhook(
         self,
@@ -31,11 +40,8 @@ class IncidentService:
         raw_payload: dict[str, object],
     ) -> Incident:
         incident = Incident(
-            thread_id=None,
             title=title,
             status=IncidentStatus.ANALYZING.value,
-            evidence_logs=evidence_logs,
-            raw_payload=raw_payload,
             severity=severity,
             analysis_status=IncidentAnalysisStatus.PENDING.value,
             analysis_attempts=0,
@@ -46,6 +52,13 @@ class IncidentService:
         )
         with self.session_factory() as db:
             db.add(incident)
+            db.flush()
+            self.raw_log_service.create_for_incident_in_session(
+                db=db,
+                incident_idx=incident.idx,
+                evidence_logs=evidence_logs,
+                raw_payload=raw_payload,
+            )
             db.commit()
             db.refresh(incident)
             return incident
@@ -79,15 +92,15 @@ class IncidentService:
     ) -> Incident:
         with self.session_factory() as db:
             incident = self._get_incident_or_raise(db, incident_idx)
-            incident.thread_id = thread_id
-            incident.analysis_result = analysis.model_dump()
             incident.is_identified_threat = analysis.is_true_positive
             incident.severity = analysis.severity
-            incident.attack_type = analysis.attack_type
-            incident.confidence_score = analysis.confidence_score
-            incident.attacker_ip = analysis.attack_ip
-            incident.analysis_summary = analysis.analysis_summary
             incident.analysis_last_error = None
+            self.report_service.create_from_analysis_in_session(
+                db=db,
+                incident_idx=incident_idx,
+                thread_id=thread_id,
+                analysis=analysis,
+            )
 
             if analysis.is_true_positive:
                 incident.status = IncidentStatus.PENDING_REVIEW.value
@@ -165,7 +178,7 @@ class IncidentService:
                 .filter(Incident.status == IncidentStatus.PENDING_REVIEW.value)
                 .all()
             )
-            return incidents
+            return self._get_incidents_with_reports(db, incidents)
 
     def get_incidents(
         self,
@@ -186,27 +199,40 @@ class IncidentService:
             if severity:
                 query = query.filter(Incident.severity == severity)
             if q:
-                pattern = f"%{q.strip()}%"
-                query = query.filter(
-                    or_(
-                        Incident.attack_type.ilike(pattern),
-                        Incident.attacker_ip.ilike(pattern),
-                        Incident.analysis_summary.ilike(pattern),
-                        Incident.evidence_logs.ilike(pattern),
-                        sql_cast(Incident.analysis_result, String).ilike(pattern),
+                keyword = q.strip()
+                if keyword:
+                    pattern = f"%{keyword}%"
+                    query = query.outerjoin(
+                        IncidentReport, IncidentReport.incident_idx == Incident.idx
+                    ).outerjoin(
+                        IncidentRawLog, IncidentRawLog.incident_idx == Incident.idx
                     )
-                )
+                    query = query.filter(
+                        or_(
+                            IncidentReport.attack_type.ilike(pattern),
+                            IncidentReport.attacker_ip.ilike(pattern),
+                            IncidentReport.analysis_summary.ilike(pattern),
+                            IncidentRawLog.evidence_logs.ilike(pattern),
+                            sql_cast(IncidentReport.analysis_result, String).ilike(
+                                pattern
+                            ),
+                        )
+                    )
 
-            total = int(query.with_entities(func.count(Incident.idx)).scalar() or 0)
+            total = int(
+                query.with_entities(func.count(func.distinct(Incident.idx))).scalar()
+                or 0
+            )
             incidents = (
-                query.order_by(Incident.created_at.desc())
+                query.distinct()
+                .order_by(Incident.created_at.desc())
                 .offset((page - 1) * limit)
                 .limit(limit)
                 .all()
             )
 
             return IncidentListResult(
-                items=incidents,
+                items=self._get_incidents_with_reports(db, incidents),
                 page=page,
                 limit=limit,
                 total=total,
@@ -256,7 +282,7 @@ class IncidentService:
                 pending_count=pending_count,
                 today_count=today_count,
                 resolved_count=resolved_count,
-                recent_pending=recent_pending,
+                recent_pending=self._get_incidents_with_reports(db, recent_pending),
             )
 
     def _get_incident_or_raise(self, db: Session, incident_idx: int) -> Incident:
@@ -264,3 +290,18 @@ class IncidentService:
         if incident is None:
             raise ValueError("Incident not found")
         return incident
+
+    def _get_incidents_with_reports(
+        self, db: Session, incidents: list[Incident]
+    ) -> list[IncidentWithReport]:
+        latest_by_incident = self.report_service.get_latest_for_incidents_in_session(
+            db, incidents
+        )
+
+        return [
+            IncidentWithReport(
+                incident=incident,
+                report=latest_by_incident.get(incident.idx),
+            )
+            for incident in incidents
+        ]
