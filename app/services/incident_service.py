@@ -158,45 +158,7 @@ class IncidentService:
             incident.response_plan_last_error = str(error)
             db.commit()
 
-    def create_incident_from_analysis(
-        self,
-        db: Session,
-        title: str,
-        raw_log: str,
-        analysis_data: dict[str, object] | None,
-        is_threat: bool,
-        thread_id: str,
-        severity: str | None = None,
-        attack_type: str | None = None,
-        confidence_score: float | None = None,
-        attacker_ip: str | None = None,
-        analysis_summary: str | None = None,
-    ) -> Incident:
-        incident = Incident(
-            thread_id=thread_id,
-            title=title,
-            status=IncidentStatus.PENDING_REVIEW.value
-            if is_threat
-            else IncidentStatus.RESOLVED.value,
-            evidence_logs=raw_log,
-            analysis_result=analysis_data,
-            is_identified_threat=is_threat,
-            severity=severity,
-            attack_type=attack_type,
-            confidence_score=confidence_score,
-            attacker_ip=attacker_ip,
-            analysis_summary=analysis_summary,
-            analysis_status=IncidentAnalysisStatus.COMPLETED.value,
-            response_plan_status=IncidentResponsePlanStatus.PENDING.value
-            if is_threat
-            else None,
-        )
-        db.add(incident)
-        db.commit()
-        db.refresh(incident)
-        return incident
-
-    def get_pending_incidents(self) -> list[Incident]:
+    def get_pending_incidents(self) -> list[IncidentWithReport]:
         with self.session_factory() as db:
             incidents = (
                 db.query(Incident)

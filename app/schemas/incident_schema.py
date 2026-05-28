@@ -29,11 +29,6 @@ IncidentStatus = Literal[
 ]
 
 
-class IncidentIOCsResponse(BaseModel):
-    attacker_ips: list[str] = Field(default_factory=list)
-    target_uris: list[str] = Field(default_factory=list)
-
-
 class IncidentKeyIndicatorResponse(BaseModel):
     label: str
     value: bool
