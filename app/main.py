@@ -1,7 +1,14 @@
 import logging
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.container import Container
+from app.core.exception_handlers import (
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
 from app.controllers import (
     webhook_controller,
     incident_controller,
@@ -34,6 +41,9 @@ def create_app() -> FastAPI:
 
     app = FastAPI()
     app.state.container = container
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
