@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -12,40 +12,35 @@ from starlette import status
 logger = logging.getLogger(__name__)
 
 
-def register_exception_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)
-    app.add_exception_handler(Exception, unhandled_exception_handler)
-
-
 async def http_exception_handler(
     request: Request,
-    exc: StarletteHTTPException,
+    exception: Exception,
 ) -> JSONResponse:
-    detail = jsonable_encoder(exc.detail)
-    message = _detail_to_message(detail)
+    if not isinstance(exception, StarletteHTTPException):
+        return await unhandled_exception_handler(request, exception)
+
+    detail = jsonable_encoder(exception.detail)
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=exception.status_code,
         content=_error_response(
-            code=_http_error_code(exc.status_code),
-            message=message,
             detail=detail,
             path=request.url.path,
         ),
-        headers=getattr(exc, "headers", None),
+        headers=getattr(exception, "headers", None),
     )
 
 
 async def validation_exception_handler(
     request: Request,
-    exc: RequestValidationError,
+    exception: Exception,
 ) -> JSONResponse:
+    if not isinstance(exception, RequestValidationError):
+        return await unhandled_exception_handler(request, exception)
+
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_400_BAD_REQUEST,
         content=_error_response(
-            code="VALIDATION_ERROR",
-            message="Request validation failed",
-            detail=jsonable_encoder(exc.errors()),
+            detail=jsonable_encoder(exception.errors()),
             path=request.url.path,
         ),
     )
@@ -53,7 +48,7 @@ async def validation_exception_handler(
 
 async def unhandled_exception_handler(
     request: Request,
-    exc: Exception,
+    exception: Exception,
 ) -> JSONResponse:
     logger.exception(
         "Unhandled exception during request: %s %s",
@@ -63,8 +58,6 @@ async def unhandled_exception_handler(
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=_error_response(
-            code="INTERNAL_SERVER_ERROR",
-            message="Internal server error",
             detail="Internal server error",
             path=request.url.path,
         ),
@@ -73,46 +66,10 @@ async def unhandled_exception_handler(
 
 def _error_response(
     *,
-    code: str,
-    message: str,
     detail: Any,
     path: str,
 ) -> dict[str, Any]:
     return {
         "detail": detail,
-        "error": {
-            "code": code,
-            "message": message,
-            "path": path,
-        },
+        "path": path,
     }
-
-
-def _detail_to_message(detail: Any) -> str:
-    if isinstance(detail, str):
-        return detail
-    if isinstance(detail, dict):
-        message = detail.get("message") or detail.get("detail")
-        if isinstance(message, str):
-            return message
-    return "Request failed"
-
-
-def _http_error_code(status_code: int) -> str:
-    if status_code == status.HTTP_400_BAD_REQUEST:
-        return "BAD_REQUEST"
-    if status_code == status.HTTP_404_NOT_FOUND:
-        return "NOT_FOUND"
-    if status_code == status.HTTP_401_UNAUTHORIZED:
-        return "UNAUTHORIZED"
-    if status_code == status.HTTP_403_FORBIDDEN:
-        return "FORBIDDEN"
-    if status_code == status.HTTP_405_METHOD_NOT_ALLOWED:
-        return "METHOD_NOT_ALLOWED"
-    if status_code == status.HTTP_409_CONFLICT:
-        return "CONFLICT"
-    if status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
-        return "VALIDATION_ERROR"
-    if status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
-        return "INTERNAL_SERVER_ERROR"
-    return "HTTP_ERROR"
