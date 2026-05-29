@@ -18,16 +18,16 @@ from .tools import ElasticsearchMCPToolProvider
 
 
 class IncidentAgent:
-    def __init__(
-        self, settings: Settings
-    ):
+    def __init__(self, settings: Settings):
         self.settings = settings
         self._tools: list[BaseTool] = []
         self.mcp_tools = ElasticsearchMCPToolProvider(settings)
         self._initialize_lock = asyncio.Lock()
         self._initialized = False
         self.graph: CompiledStateGraph | None = None
-        self._checkpointer_cm: AbstractAsyncContextManager[AsyncPostgresSaver] | None = None
+        self._checkpointer_cm: (
+            AbstractAsyncContextManager[AsyncPostgresSaver] | None
+        ) = None
         self._checkpointer: AsyncPostgresSaver | None = None
 
     async def initialize(self) -> None:
@@ -81,7 +81,9 @@ class IncidentAgent:
     async def _open_checkpointer(self) -> None:
         if self._checkpointer is not None:
             return
-        self._checkpointer_cm = AsyncPostgresSaver.from_conn_string(self.settings.db_url)
+        self._checkpointer_cm = AsyncPostgresSaver.from_conn_string(
+            self.settings.db_url
+        )
         self._checkpointer = await self._checkpointer_cm.__aenter__()
         await self._checkpointer.setup()
 
