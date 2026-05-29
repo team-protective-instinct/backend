@@ -5,9 +5,9 @@ from typing import cast
 
 from langchain_core.messages import HumanMessage
 
-from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
-from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
-from app.agents.incident_analyzer.state import AgentState
+from app.agents.incident_agent.agent import IncidentAgent
+from app.agents.incident_agent.prompt import LOG_ANALYSIS_REQUEST_PREFIX
+from app.agents.incident_agent.state import AgentState
 from app.agents.response_plan_agent.agent import ResponsePlanAgent
 from app.agents.response_plan_agent.state import ResponsePlanState
 from app.models import Incident, IncidentReport
@@ -23,7 +23,7 @@ MAX_INCIDENT_AGENT_INPUT_CHARS = 12000
 class AiInvokerService:
     def __init__(
         self,
-        threat_agent: ThreatAnalyzerAgent,
+        threat_agent: IncidentAgent,
         response_plan_agent: ResponsePlanAgent,
         playbook_service: PlaybookService,
     ):
@@ -31,7 +31,9 @@ class AiInvokerService:
         self.response_plan_agent = response_plan_agent
         self.playbook_service = playbook_service
 
-    def generate_incident_reports(self, log_text: str) -> tuple[str, AnalysisReport]:
+    async def generate_incident_reports(
+        self, log_text: str
+    ) -> tuple[str, AnalysisReport]:
         thread_id = str(uuid.uuid4())
         bounded_log_text = self._truncate_for_llm(log_text)
         logger.info(
@@ -49,7 +51,7 @@ class AiInvokerService:
         logger.info("[Starting Threat Analysis - Thread ID: %s]", thread_id)
         final_state = cast(
             AgentState,
-            self.threat_agent.invoke(
+            await self.threat_agent.ainvoke(
                 initial_state, config={"configurable": {"thread_id": thread_id}}
             ),
         )

@@ -1,5 +1,5 @@
+import asyncio
 import logging
-import time
 
 from app.core.container import Container
 from app.services.ai_invoker_service import AiInvokerService
@@ -30,19 +30,19 @@ class IncidentAgentWorker:
         self.batch_size = batch_size
         self.poll_interval_seconds = poll_interval_seconds
 
-    def run_forever(self) -> None:
+    async def run_forever(self) -> None:
         logger.info("Incident agent worker started")
         while True:
             try:
-                processed_count = self.run_once()
+                processed_count = await self.run_once()
             except Exception:
                 logger.exception("Incident agent worker iteration failed")
-                time.sleep(self.poll_interval_seconds)
+                await asyncio.sleep(self.poll_interval_seconds)
                 continue
             if processed_count == 0:
-                time.sleep(self.poll_interval_seconds)
+                await asyncio.sleep(self.poll_interval_seconds)
 
-    def run_once(self) -> int:
+    async def run_once(self) -> int:
         incidents = self.incident_service.claim_pending_analysis_batch(
             limit=self.batch_size
         )
@@ -51,7 +51,10 @@ class IncidentAgentWorker:
                 raw_log = self.raw_log_service.get_latest_by_incident(incident.idx)
                 if raw_log is None:
                     raise RuntimeError("Incident raw log not found")
-                thread_id, analysis = self.ai_invoker_service.generate_incident_reports(
+                (
+                    thread_id,
+                    analysis,
+                ) = await self.ai_invoker_service.generate_incident_reports(
                     raw_log.evidence_logs
                 )
                 self.incident_service.mark_analysis_succeeded(
@@ -66,16 +69,20 @@ class IncidentAgentWorker:
         return len(incidents)
 
 
-def main() -> None:
+async def main() -> None:
     container = Container()
     container.db().create_database()
-    worker = IncidentAgentWorker(
-        incident_service=container.incident_service(),
-        raw_log_service=container.incident_raw_log_service(),
-        ai_invoker_service=container.ai_invoker_service(),
-    )
-    worker.run_forever()
+    await container.threat_agent().initialize()
+    try:
+        worker = IncidentAgentWorker(
+            incident_service=container.incident_service(),
+            raw_log_service=container.incident_raw_log_service(),
+            ai_invoker_service=container.ai_invoker_service(),
+        )
+        await worker.run_forever()
+    finally:
+        await container.threat_agent().aclose()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
