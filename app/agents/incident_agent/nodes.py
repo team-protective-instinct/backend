@@ -1,12 +1,12 @@
-import json
-import logging
 from typing import cast
+from collections.abc import Sequence
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
     SystemMessage,
     merge_message_runs,
 )
+from langchain_core.tools import BaseTool
 
 from .constants import AnalyzerNodeName
 from .prompt import (
@@ -14,59 +14,48 @@ from .prompt import (
     THREAT_ANALYSIS_AGENT_SYSTEM_PROMPT,
     GENERATE_REPORT_NUDGE,
 )
-from functools import lru_cache
 from .state import AgentState
-from .tools import analyze_payload, check_ip_reputation
 from app.core.llm import get_llm
 from app.schemas.agent_schema import AnalysisReport
 
-logger = logging.getLogger(__name__)
 
-
-@lru_cache(maxsize=1)
-def _get_llm_resources():
+def _get_llm_resources(tools: Sequence[BaseTool]):
     """
     Lazy loader for LLM instances to avoid overhead during module import.
     """
     llm = get_llm(temperature=1.0)
-    tools = [check_ip_reputation, analyze_payload]
 
     return {
-        "llm_with_tools": llm.bind_tools(tools),
+        "llm_with_tools": llm.bind_tools(list(tools)),
         "llm_analysis_report": llm.with_structured_output(AnalysisReport),
     }
 
 
-def reason_and_act(state: AgentState):
+async def reason_and_act(state: AgentState, tools: Sequence[BaseTool]):
     """
     Node for the LLM to decide the next action based on messages.
     """
-    resources = _get_llm_resources()
+    collector = _get_llm_resources(tools)["llm_with_tools"]
     system_prompt = SystemMessage(content=THREAT_ANALYSIS_AGENT_SYSTEM_PROMPT)
 
     messages = merge_message_runs([system_prompt] + state["messages"])
 
-    response = resources["llm_with_tools"].invoke(messages)
+    response = await collector.ainvoke(messages)
     return {"messages": [response]}
 
 
-def generate_final_report(state: AgentState):
+async def generate_final_report(state: AgentState, tools: Sequence[BaseTool]):
     """
     Node to generate the final integrated security analysis report.
     """
-    resources = _get_llm_resources()
+    reporter = _get_llm_resources(tools)["llm_analysis_report"]
     report_prompt = SystemMessage(content=ANALYSIS_REPORT_SYSTEM_PROMPT)
 
     # Nudge the LLM to provide the final integrated report
     nudge_msg = HumanMessage(content=GENERATE_REPORT_NUDGE)
 
     messages = merge_message_runs([report_prompt] + state["messages"] + [nudge_msg])
-    report = cast(
-        AnalysisReport, resources["llm_analysis_report"].invoke(messages)
-    )
-
-    logger.info("AI Analysis Result JSON:")
-    logger.info(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+    report = cast(AnalysisReport, await reporter.ainvoke(messages))
 
     # Save structured results to state and add an AIMessage for tracking
     return {
