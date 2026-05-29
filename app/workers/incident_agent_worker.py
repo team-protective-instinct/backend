@@ -62,9 +62,13 @@ class IncidentAgentWorker:
                     thread_id=thread_id,
                     analysis=analysis,
                 )
-                logger.info("Incident analysis completed - incident_idx=%s", incident.idx)
+                logger.info(
+                    "Incident analysis completed - incident_idx=%s", incident.idx
+                )
             except Exception as exc:
-                logger.exception("Incident analysis failed - incident_idx=%s", incident.idx)
+                logger.exception(
+                    "Incident analysis failed - incident_idx=%s", incident.idx
+                )
                 self.incident_service.mark_analysis_failed(incident.idx, exc)
         return len(incidents)
 
