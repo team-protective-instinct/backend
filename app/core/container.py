@@ -3,7 +3,7 @@ from dependency_injector import containers, providers
 from .config import Settings
 from .database import Database
 from app.services.incident_service import IncidentService
-from app.agents.incident_analyzer.agent import ThreatAnalyzerAgent
+from app.agents.incident_agent.agent import IncidentAgent
 from app.agents.response_plan_agent.agent import ResponsePlanAgent
 from app.services.playbook_service import PlaybookService
 from app.services.response_plan_service import ResponsePlanService
@@ -21,8 +21,8 @@ class Container(containers.DeclarativeContainer):
     )
 
     threat_agent = providers.Singleton(
-        ThreatAnalyzerAgent,
-        db_pool=db.provided.pool,
+        IncidentAgent,
+        settings=config,
     )
 
     response_plan_agent = providers.Singleton(
