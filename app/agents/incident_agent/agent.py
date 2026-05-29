@@ -74,7 +74,7 @@ class IncidentAgent:
         workflow.add_edge(AnalyzerNodeName.GENERATE_REPORT, END)
 
         if self._checkpointer is None:
-            raise RuntimeError("ThreatAnalyzerAgent checkpointer was not initialized")
+            raise RuntimeError("IncidentAgent checkpointer was not initialized")
 
         return workflow.compile(checkpointer=self._checkpointer)
 
@@ -94,7 +94,7 @@ class IncidentAgent:
     async def ainvoke(self, input_data: AgentState, config: RunnableConfig):
         await self.initialize()
         if self.graph is None:
-            raise RuntimeError("ThreatAnalyzerAgent graph was not initialized")
+            raise RuntimeError("IncidentAgent graph was not initialized")
         return await self.graph.ainvoke(input_data, config=config)
 
     async def aclose(self) -> None:
