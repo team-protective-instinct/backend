@@ -62,6 +62,9 @@ class ElasticsearchMCPToolProvider:
                     "Elasticsearch MCP tools unavailable; continuing without log search: %s",
                     exc,
                 )
+                self._search_tool = None
+                self._tools = []
+                self._initialized = True
                 return
 
             search_tool = self._find_tool(loaded_tools, "search")
@@ -70,6 +73,9 @@ class ElasticsearchMCPToolProvider:
                     "Elasticsearch MCP search tool not found; loaded tools=%s",
                     [tool.name for tool in loaded_tools],
                 )
+                self._search_tool = None
+                self._tools = []
+                self._initialized = True
                 return
 
             self._search_tool = search_tool
