@@ -10,7 +10,7 @@ from app.agents.incident_analyzer.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.agents.incident_analyzer.state import AgentState
 from app.agents.response_plan_agent.agent import ResponsePlanAgent
 from app.agents.response_plan_agent.state import ResponsePlanState
-from app.models import Incident
+from app.models import Incident, IncidentReport
 from app.schemas import AnalysisReport, ResponsePlanDraft
 from app.services.playbook_service import PlaybookService
 
@@ -34,6 +34,11 @@ class AiInvokerService:
     def generate_incident_reports(self, log_text: str) -> tuple[str, AnalysisReport]:
         thread_id = str(uuid.uuid4())
         bounded_log_text = self._truncate_for_llm(log_text)
+        logger.info(
+            "AI report started - thread_id=%s input_chars=%d",
+            thread_id,
+            len(bounded_log_text),
+        )
         initial_state: AgentState = {
             "messages": [
                 HumanMessage(content=f"{LOG_ANALYSIS_REQUEST_PREFIX}{bounded_log_text}")
@@ -63,15 +68,30 @@ class AiInvokerService:
         logger.info(" - Attack Type: %s", analysis.attack_type)
         logger.info(" - Primary Attacker IP: %s", analysis.attack_ip)
         logger.info(" - Summary: %s", analysis.analysis_summary)
-        logger.debug(json.dumps(analysis.model_dump(), ensure_ascii=False, indent=2))
+        logger.info(
+            "AI report completed - thread_id=%s verdict=%s severity=%s confidence=%.3f attack_type=%s",
+            thread_id,
+            "TP" if analysis.is_true_positive else "FP",
+            analysis.severity,
+            analysis.confidence_score,
+            analysis.attack_type,
+        )
 
         return thread_id, analysis
 
     def generate_incident_response_plan(
-        self, incident: Incident
+        self, incident: Incident, report: IncidentReport, raw_log: str
     ) -> tuple[str, ResponsePlanDraft]:
-        query = self._build_retrieval_query(incident)
-        context = self._build_agent_context(incident)
+        context = self._build_agent_context(incident, report, raw_log)
+        query = self._build_retrieval_query(context)
+        logger.info(
+            "Response plan started - incident_idx=%s attack_type=%s severity=%s raw_log_chars=%d query_chars=%d",
+            incident.idx,
+            report.attack_type,
+            incident.severity,
+            len(raw_log),
+            len(query),
+        )
         retrieved_chunks = self.playbook_service.retrieve_relevant_chunks(
             query=query,
             limit=5,
@@ -95,10 +115,16 @@ class AiInvokerService:
         draft = final_state.get("response_plan")
         if draft is None:
             raise RuntimeError("ResponsePlanAgent did not generate a response plan")
+        logger.info(
+            "Response plan completed - incident_idx=%s thread_id=%s summary_chars=%d plan_chars=%d",
+            incident.idx,
+            thread_id,
+            len(draft.summary),
+            len(draft.plan_text),
+        )
         return thread_id, draft
 
-    def _build_retrieval_query(self, incident: Incident) -> str:
-        context = self._build_agent_context(incident)
+    def _build_retrieval_query(self, context: dict[str, object]) -> str:
         parts = [
             str(context.get("attack_type") or ""),
             str(context.get("severity") or ""),
@@ -109,20 +135,25 @@ class AiInvokerService:
         ]
         return "\n".join(part for part in parts if part.strip())
 
-    def _build_agent_context(self, incident: Incident) -> dict[str, object]:
-        analysis = incident.analysis_result if isinstance(incident.analysis_result, dict) else {}
-        raw_log = incident.evidence_logs or ""
+    def _build_agent_context(
+        self, incident: Incident, report: IncidentReport, raw_log: str
+    ) -> dict[str, object]:
+        analysis = (
+            report.analysis_result if isinstance(report.analysis_result, dict) else {}
+        )
         return {
             "incident_idx": incident.idx,
             "title": incident.title,
             "severity": incident.severity,
-            "attack_type": incident.attack_type,
-            "confidence_score": incident.confidence_score,
-            "attacker_ip": incident.attacker_ip,
-            "analysis_summary": incident.analysis_summary,
+            "attack_type": report.attack_type,
+            "confidence_score": report.confidence_score,
+            "attacker_ip": report.attacker_ip,
+            "analysis_summary": report.analysis_summary,
             "analysis_result": analysis,
             "target_uris": self._get_string_list(analysis, "target_uris"),
-            "suspicious_payloads": self._get_string_list(analysis, "suspicious_payloads"),
+            "suspicious_payloads": self._get_string_list(
+                analysis, "suspicious_payloads"
+            ),
             "raw_log": raw_log[:6000],
             "created_at": incident.created_at.isoformat(),
         }

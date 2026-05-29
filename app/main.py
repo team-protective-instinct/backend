@@ -5,7 +5,6 @@ from app.core.container import Container
 from app.core.exception_handlers import register_exception_handlers
 from app.controllers import (
     webhook_controller,
-    user_controller,
     incident_controller,
     response_plan_controller,
 )
@@ -25,7 +24,6 @@ def create_app() -> FastAPI:
     container.wire(
         modules=[
             webhook_controller,
-            user_controller,
             incident_controller,
             response_plan_controller,
         ]
@@ -51,7 +49,6 @@ def create_app() -> FastAPI:
 
     # Register routers
     app.include_router(webhook_controller.router)
-    app.include_router(user_controller.router)
     app.include_router(incident_controller.router)
     app.include_router(response_plan_controller.router)
 

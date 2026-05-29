@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.dtos import IncidentSummaryResult
 
 if TYPE_CHECKING:
-    from app.models import Incident, ResponsePlan
+    from app.models import Incident, IncidentRawLog, IncidentReport, ResponsePlan
     from app.schemas.agent_schema import IndicatorEvaluation
 
 from app.schemas.response_plan_schema import ResponsePlanResponse
@@ -27,11 +27,6 @@ IncidentStatus = Literal[
     "resolved",
     "dismissed",
 ]
-
-
-class IncidentIOCsResponse(BaseModel):
-    attacker_ips: list[str] = Field(default_factory=list)
-    target_uris: list[str] = Field(default_factory=list)
 
 
 class IncidentKeyIndicatorResponse(BaseModel):
@@ -63,12 +58,18 @@ class IncidentListItemResponse(BaseModel):
     created_at: datetime
 
     @classmethod
-    def from_incident(cls, incident: "Incident") -> "IncidentListItemResponse":
+    def from_incident(
+        cls, incident: "Incident", report: "IncidentReport | None" = None
+    ) -> "IncidentListItemResponse":
         return cls(
             idx=incident.idx,
-            attack_type=incident.attack_type or "Unknown",
+            attack_type=report.attack_type
+            if report and report.attack_type
+            else "Unknown",
             severity=cls._normalize_severity(incident.severity),
-            confidence_score=incident.confidence_score or 0.0,
+            confidence_score=report.confidence_score
+            if report is not None and report.confidence_score is not None
+            else 0.0,
             status=cls._normalize_status(incident.status),
             targetIp="192.168.1.50",
             targetName="Web Server (Victim)",
@@ -112,11 +113,13 @@ class IncidentDetailResponse(BaseModel):
     def from_incident(
         cls,
         incident: "Incident",
+        report: "IncidentReport | None" = None,
+        raw_log: "IncidentRawLog | None" = None,
         response_plan: "ResponsePlan | None" = None,
     ) -> "IncidentDetailResponse":
         analysis = (
-            incident.analysis_result
-            if isinstance(incident.analysis_result, dict)
+            report.analysis_result
+            if report is not None and isinstance(report.analysis_result, dict)
             else {}
         )
 
@@ -135,16 +138,17 @@ class IncidentDetailResponse(BaseModel):
                             )
                         )
                     except Exception:
-                        pass
+                        continue
 
-        severity = analysis.get("severity")
-        severity_str: str = str(severity) if severity else "low"
+        severity_str = incident.severity or "low"
 
         attack_ip = analysis.get("attack_ip")
         attack_ip_str: str | None = (
             str(attack_ip)
             if isinstance(attack_ip, (str, int))
-            else incident.attacker_ip
+            else report.attacker_ip
+            if report is not None
+            else None
         )
 
         target_uris_data = analysis.get("target_uris")
@@ -161,9 +165,13 @@ class IncidentDetailResponse(BaseModel):
 
         return cls(
             idx=incident.idx,
-            attack_type=incident.attack_type or "Unknown",
+            attack_type=report.attack_type
+            if report and report.attack_type
+            else "Unknown",
             severity=severity_str,
-            confidence_score=incident.confidence_score or 0.0,
+            confidence_score=report.confidence_score
+            if report is not None and report.confidence_score is not None
+            else 0.0,
             status=incident.status or "analyzing",
             targetIp="192.168.1.50",
             targetName="Web Server (Victim)",
@@ -172,9 +180,11 @@ class IncidentDetailResponse(BaseModel):
             attack_ip=attack_ip_str,
             target_uris=target_uris,
             suspicious_payloads=suspicious_payloads,
-            analysis_summary=incident.analysis_summary or "",
+            analysis_summary=report.analysis_summary
+            if report and report.analysis_summary
+            else "",
             key_indicators=key_indicators,
-            raw_log=incident.evidence_logs or "",
+            raw_log=raw_log.evidence_logs if raw_log is not None else "",
             response_plan=ResponsePlanResponse.from_response_plan(response_plan)
             if response_plan is not None
             else None,
@@ -200,7 +210,7 @@ class OverviewSummaryResponse(BaseModel):
         cls, incident: IncidentSummaryResult
     ) -> "OverviewSummaryResponse":
         recent_pending = [
-            IncidentListItemResponse.from_incident(recent)
+            IncidentListItemResponse.from_incident(recent.incident, recent.report)
             for recent in incident.recent_pending
         ]
 

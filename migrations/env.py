@@ -9,11 +9,20 @@ from alembic import context
 
 # alembic은 기본적으로 별도의 도구처럼 동작하기 때문에, 프로젝트 내부의 `app` 모듈을 인식하지 못함.
 # 따라서 프로젝트 루트 디렉토리를 sys.path에 추가해야 함.
-sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.core.config import settings
 from app.core.database import Base
-from app.models import Incident, RagPlaybook, RagPlaybookChunk, ResponsePlan, User, VictimSystem  # Ensure all models are imported
+
+from app.models import (
+    Incident,
+    IncidentRawLog,
+    IncidentReport,
+    RagPlaybook,
+    RagPlaybookChunk,
+    ResponsePlan,
+    VictimSystem,
+)  # Ensure all models are imported
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -77,9 +86,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
