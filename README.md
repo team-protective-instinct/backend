@@ -55,6 +55,30 @@ cp .env.example .env
 
 생성된 `.env` 파일을 열고, 팀 내 공유된 데이터베이스 정보 및 설정값을 입력합니다.
 
+#### Elasticsearch MCP 로그 검색 설정
+
+incident analyzer가 Elasticsearch MCP 서버를 통해 추가 로그를 조회할 수 있습니다. 기본값은 비활성화이며, 필요할 때만 켭니다.
+
+```bash
+ELASTICSEARCH_MCP_ENABLED=false
+ELASTICSEARCH_MCP_URL=http://localhost:8085/mcp
+ELASTICSEARCH_MCP_ALLOWED_INDEX_PATTERN=logstash-*
+ELASTICSEARCH_MCP_SERVICE_FIELD=fields.service
+ELASTICSEARCH_MCP_SERVICE_VALUE=dvwa-apache
+ELASTICSEARCH_MCP_MAX_RESULTS=20
+ELASTICSEARCH_MCP_MAX_WINDOW_MINUTES=30
+ELASTICSEARCH_MCP_REQUEST_TIMEOUT_SECONDS=10
+```
+
+- `ELASTICSEARCH_MCP_ENABLED`: MCP 로그 검색 사용 여부
+- `ELASTICSEARCH_MCP_URL`: MCP 서버 주소
+- `ELASTICSEARCH_MCP_ALLOWED_INDEX_PATTERN`: 조회 허용 index pattern
+- `ELASTICSEARCH_MCP_SERVICE_FIELD`: 서비스 필터를 적용할 필드
+- `ELASTICSEARCH_MCP_SERVICE_VALUE`: 필터 값
+- `ELASTICSEARCH_MCP_MAX_RESULTS`: 한 번에 반환할 최대 결과 수
+- `ELASTICSEARCH_MCP_MAX_WINDOW_MINUTES`: 조회할 수 있는 최대 시간 범위
+- `ELASTICSEARCH_MCP_REQUEST_TIMEOUT_SECONDS`: MCP 응답 대기 시간
+
 ### 5. 데이터베이스(PostgreSQL) 실행
 
 프로젝트는 로컬 환경에서 **Docker Compose**를 이용해 PostgreSQL 및 `pgvector`를 실행합니다. 원활한 실행을 위해 PC에 [Docker Desktop](https://www.docker.com/products/docker-desktop/) 또는 Docker가 설치되어 있어야 합니다.
