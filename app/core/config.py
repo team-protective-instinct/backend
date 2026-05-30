@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     ELASTICSEARCH_MCP_MAX_WINDOW_MINUTES: int = Field(default=30)
     ELASTICSEARCH_MCP_REQUEST_TIMEOUT_SECONDS: int = Field(default=10)
 
+    # Victim MCP settings for response-plan enrichment and future execution.
+    VICTIM_MCP_ENABLED: bool = Field(default=False)
+    VICTIM_MCP_URL: str = Field(default="http://localhost:9001/mcp")
+    VICTIM_MCP_REQUEST_TIMEOUT_SECONDS: int = Field(default=10)
+    VICTIM_MCP_MAX_RESULT_CHARS: int = Field(default=6000)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -53,12 +53,15 @@ class AiInvokerService:
 
         return thread_id, analysis
 
-    def generate_incident_response_plan(
+    async def generate_incident_response_plan(
         self, incident: Incident, report: IncidentReport, raw_log: str
     ) -> tuple[str, ResponsePlanDraft]:
-        context = self._build_agent_context(incident, report, raw_log)
+        context = self._build_agent_context_for_incident_report(
+            incident, report, raw_log
+        )
         query = self._build_retrieval_query(context)
 
+        # RAG retrieval을 통해 플레이북에서 유사한 사례들을 가져와서 대응 계획 수립에 참고하도록 한다.
         retrieved_chunks = self.playbook_service.retrieve_relevant_chunks(
             query=query,
             limit=5,
@@ -74,7 +77,7 @@ class AiInvokerService:
         }
         final_state = cast(
             ResponsePlanState,
-            self.response_plan_agent.invoke(
+            await self.response_plan_agent.ainvoke(
                 initial_state,
                 config={"configurable": {"thread_id": thread_id}},
             ),
@@ -96,7 +99,7 @@ class AiInvokerService:
         ]
         return "\n".join(part for part in parts if part.strip())
 
-    def _build_agent_context(
+    def _build_agent_context_for_incident_report(
         self, incident: Incident, report: IncidentReport, raw_log: str
     ) -> dict[str, object]:
         analysis = (
