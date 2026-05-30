@@ -27,7 +27,7 @@ class Container(containers.DeclarativeContainer):
 
     response_plan_agent = providers.Singleton(
         ResponsePlanAgent,
-        db_pool=db.provided.pool,
+        settings=config,
     )
 
     playbook_service = providers.Factory(
