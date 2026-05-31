@@ -1,10 +1,9 @@
 from typing import NotRequired, TypedDict
 
-from app.schemas import ResponsePlanDraft
+from app.schemas import ResponsePlanGenerationResult
 
 
 class ResponsePlanState(TypedDict):
     context: dict[str, object]
     retrieved_chunks: list[dict[str, object]]
-    victim_mcp_context: NotRequired[str]
-    response_plan: NotRequired[ResponsePlanDraft]
+    response_plan: NotRequired[ResponsePlanGenerationResult]
