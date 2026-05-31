@@ -28,3 +28,12 @@ class ResponsePlanStatus(str, Enum):
     DENIED = "denied"
     EXECUTING = "executing"
     EXECUTED = "executed"
+    FAILED = "failed"
+
+
+class ResponsePlanActionStatus(str, Enum):
+    PENDING = "pending"
+    EXECUTING = "executing"
+    EXECUTED = "executed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
