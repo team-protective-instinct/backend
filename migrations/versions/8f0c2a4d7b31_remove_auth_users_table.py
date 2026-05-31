@@ -1,7 +1,7 @@
 """remove auth users table
 
 Revision ID: 8f0c2a4d7b31
-Revises: e7fc6e9c12f9
+Revises: 4b2a1c9d8e3f
 Create Date: 2026-05-28 00:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "8f0c2a4d7b31"
-down_revision: Union[str, Sequence[str], None] = "e7fc6e9c12f9"
+down_revision: Union[str, Sequence[str], None] = "4b2a1c9d8e3f"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

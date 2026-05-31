@@ -10,6 +10,7 @@ from app.models.constants import ResponsePlanStatus
 
 if TYPE_CHECKING:
     from app.models.incident_model import Incident
+    from app.models.response_plan_action_model import ResponsePlanAction
 
 
 class ResponsePlan(Base):
@@ -21,13 +22,9 @@ class ResponsePlan(Base):
     )
     thread_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
-    plan_text: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True, default=ResponsePlanStatus.PENDING
     )
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    denied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     denied_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), nullable=False
@@ -37,3 +34,9 @@ class ResponsePlan(Base):
     )
 
     incident: Mapped["Incident"] = relationship()
+    actions: Mapped[list["ResponsePlanAction"]] = relationship(
+        back_populates="response_plan",
+        cascade="all, delete-orphan",
+        order_by="ResponsePlanAction.execution_order",
+        lazy="selectin",
+    )

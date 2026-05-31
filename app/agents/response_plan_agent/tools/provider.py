@@ -8,7 +8,7 @@ from langchain_core.tools import BaseTool
 
 from app.core.config import Settings
 
-from .victim_mcp_tool import build_list_uploaded_files_wrapper
+from .victim_mcp_tool import ALLOWED_VICTIM_MCP_ACTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,6 @@ class VictimMCPToolProvider:
         self._lock = asyncio.Lock()
         self._initialized = False
         self._tools: list[BaseTool] = []
-        self._list_uploaded_files_tool: BaseTool | None = None
 
     @property
     def tools(self) -> list[BaseTool]:
@@ -45,30 +44,43 @@ class VictimMCPToolProvider:
                     "Victim MCP tools unavailable; continuing without victim context: %s",
                     exc,
                 )
-                self._list_uploaded_files_tool = None
                 self._tools = []
                 self._initialized = True
                 return
 
-            list_tool = self._find_tool(loaded_tools, "list_uploaded_files")
-            if list_tool is None:
-                loaded_tool_names = [tool.name for tool in loaded_tools]
+            action_tools = [
+                tool
+                for tool in loaded_tools
+                if self._base_tool_name(tool.name) in ALLOWED_VICTIM_MCP_ACTIONS
+            ]
+            loaded_tool_names = [tool.name for tool in loaded_tools]
+            missing_tools = sorted(
+                ALLOWED_VICTIM_MCP_ACTIONS
+                - {self._base_tool_name(tool.name) for tool in action_tools}
+            )
+            if missing_tools:
                 logger.warning(
-                    "Victim MCP list_uploaded_files tool not found; loaded tools=%s. "
-                    "Response plan agent will continue without Victim MCP context. "
-                    "If capstone-victim source already registers list_uploaded_files, "
-                    "rebuild/restart the DVWA victim container so the running MCP server matches the source.",
+                    "Victim MCP defense tools missing; missing=%s loaded=%s",
+                    missing_tools,
                     loaded_tool_names,
                 )
-                self._list_uploaded_files_tool = None
+
+            if not action_tools:
+                loaded_tool_names = [tool.name for tool in loaded_tools]
+                logger.warning(
+                    "No executable Victim MCP defense tools found; loaded tools=%s",
+                    loaded_tool_names,
+                )
                 self._tools = []
                 self._initialized = True
                 return
 
-            self._list_uploaded_files_tool = list_tool
-            self._tools = [build_list_uploaded_files_wrapper(self.settings, list_tool)]
+            self._tools = action_tools
             self._initialized = True
-            logger.info("Victim MCP response-plan context enabled")
+            logger.info(
+                "Victim MCP response-plan execution enabled with tools=%s",
+                [tool.name for tool in action_tools],
+            )
 
     async def _load_tools(self) -> Sequence[BaseTool]:
         client_module = import_module("langchain_mcp_adapters.client")
@@ -90,13 +102,10 @@ class VictimMCPToolProvider:
             ),
         )
 
-    def _find_tool(self, tools: Sequence[BaseTool], tool_name: str) -> BaseTool | None:
-        for candidate in tools:
-            name = candidate.name.lower()
-            if (
-                name == tool_name
-                or name.endswith(f"__{tool_name}")
-                or name.endswith(f"_{tool_name}")
-            ):
-                return candidate
-        return None
+    def _base_tool_name(self, tool_name: str) -> str:
+        name = tool_name.lower()
+        if name.startswith("victim__"):
+            return name.removeprefix("victim__")
+        if name.startswith("victim_"):
+            return name.removeprefix("victim_")
+        return name

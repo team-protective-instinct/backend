@@ -9,7 +9,7 @@ from app.agents.incident_agent.state import AgentState
 from app.agents.response_plan_agent.agent import ResponsePlanAgent
 from app.agents.response_plan_agent.state import ResponsePlanState
 from app.models import Incident, IncidentReport
-from app.schemas import AnalysisReport, ResponsePlanDraft
+from app.schemas import AnalysisReport, ResponsePlanGenerationResult
 from app.services.playbook_service import PlaybookService
 
 
@@ -55,7 +55,7 @@ class AiInvokerService:
 
     async def generate_incident_response_plan(
         self, incident: Incident, report: IncidentReport, raw_log: str
-    ) -> tuple[str, ResponsePlanDraft]:
+    ) -> tuple[str, ResponsePlanGenerationResult]:
         context = self._build_agent_context_for_incident_report(
             incident, report, raw_log
         )

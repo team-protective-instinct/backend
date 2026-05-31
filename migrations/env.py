@@ -21,6 +21,7 @@ from app.models import (
     RagPlaybook,
     RagPlaybookChunk,
     ResponsePlan,
+    ResponsePlanAction,
     VictimSystem,
 )  # Ensure all models are imported
 

@@ -1,12 +1,11 @@
 import logging
-from datetime import datetime
 from typing import Callable
 
 from sqlalchemy.orm import Session
 
-from app.models import Incident, ResponsePlan
+from app.models import Incident, ResponsePlan, ResponsePlanAction
 from app.models.constants import ResponsePlanStatus
-from app.schemas import ResponsePlanDraft
+from app.schemas import ResponsePlanGenerationResult
 
 
 logger = logging.getLogger(__name__)
@@ -16,11 +15,11 @@ class ResponsePlanService:
     def __init__(self, session_factory: Callable[..., Session]):
         self.session_factory: Callable[..., Session] = session_factory
 
-    def create_from_draft(
+    def create_from_generation_result(
         self,
         incident_idx: int,
         thread_id: str,
-        draft: ResponsePlanDraft,
+        generation_result: ResponsePlanGenerationResult,
     ) -> ResponsePlan:
         with self.session_factory() as db:
             incident = db.query(Incident).filter(Incident.idx == incident_idx).first()
@@ -35,7 +34,7 @@ class ResponsePlanService:
                 db=db,
                 incident_idx=incident_idx,
                 thread_id=thread_id,
-                draft=draft,
+                generation_result=generation_result,
             )
             logger.info(
                 "Response plan created - incident_idx=%s response_plan_idx=%s",
@@ -43,6 +42,18 @@ class ResponsePlanService:
                 response_plan.idx,
             )
             return response_plan
+
+    def create_from_draft(
+        self,
+        incident_idx: int,
+        thread_id: str,
+        draft: ResponsePlanGenerationResult,
+    ) -> ResponsePlan:
+        return self.create_from_generation_result(
+            incident_idx=incident_idx,
+            thread_id=thread_id,
+            generation_result=draft,
+        )
 
     def get_by_incident(self, incident_idx: int) -> ResponsePlan | None:
         with self.session_factory() as db:
@@ -60,8 +71,6 @@ class ResponsePlanService:
                 raise ValueError("Only pending response plans can be approved")
 
             response_plan.status = ResponsePlanStatus.APPROVED.value
-            response_plan.approved_at = datetime.now()
-            response_plan.denied_at = None
             response_plan.denied_reason = None
             db.commit()
             db.refresh(response_plan)
@@ -74,8 +83,15 @@ class ResponsePlanService:
                 raise ValueError("Only pending response plans can be denied")
 
             response_plan.status = ResponsePlanStatus.DENIED.value
-            response_plan.denied_at = datetime.now()
             response_plan.denied_reason = denied_reason
+            db.commit()
+            db.refresh(response_plan)
+            return response_plan
+
+    def update_status(self, response_plan_idx: int, status: str) -> ResponsePlan:
+        with self.session_factory() as db:
+            response_plan = self._get_response_plan_or_raise(db, response_plan_idx)
+            response_plan.status = status
             db.commit()
             db.refresh(response_plan)
             return response_plan
@@ -85,17 +101,28 @@ class ResponsePlanService:
         db: Session,
         incident_idx: int,
         thread_id: str,
-        draft: ResponsePlanDraft,
+        generation_result: ResponsePlanGenerationResult,
     ) -> ResponsePlan:
         response_plan = ResponsePlan(
             incident_idx=incident_idx,
             thread_id=thread_id,
-            summary=draft.summary,
-            rationale=draft.rationale,
-            plan_text=draft.plan_text,
+            summary=generation_result.summary,
             status=ResponsePlanStatus.PENDING.value,
         )
         db.add(response_plan)
+        db.flush()
+
+        for index, action in enumerate(generation_result.actions, start=1):
+            db.add(
+                ResponsePlanAction(
+                    response_plan_idx=response_plan.idx,
+                    execution_order=action.execution_order or index,
+                    tool_name=action.tool_name,
+                    arguments=action.arguments,
+                    reason=action.reason,
+                )
+            )
+
         db.commit()
         db.refresh(response_plan)
         return response_plan
