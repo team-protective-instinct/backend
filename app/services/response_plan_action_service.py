@@ -38,6 +38,24 @@ class ResponsePlanActionService:
             db.expunge(action)
             return action
 
+    def skip_pending_actions(self, response_plan_idx: int, reason: str) -> None:
+        with self.session_factory() as db:
+            db.query(ResponsePlanAction).filter(
+                ResponsePlanAction.response_plan_idx == response_plan_idx,
+                ResponsePlanAction.status == ResponsePlanActionStatus.PENDING.value,
+            ).update(
+                {
+                    ResponsePlanAction.status: ResponsePlanActionStatus.SKIPPED.value,
+                    ResponsePlanAction.result: {
+                        "ok": False,
+                        "status": "skipped",
+                        "reason": reason,
+                    },
+                },
+                synchronize_session=False,
+            )
+            db.commit()
+
     def _get_action(self, db: Session, action_idx: int) -> ResponsePlanAction:
         action = (
             db.query(ResponsePlanAction)
