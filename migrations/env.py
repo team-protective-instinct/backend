@@ -22,7 +22,6 @@ from app.models import (
     RagPlaybookChunk,
     ResponsePlan,
     ResponsePlanAction,
-    VictimSystem,
 )  # Ensure all models are imported
 
 # this is the Alembic Config object, which provides
