@@ -64,6 +64,14 @@ class ResponsePlanService:
                 .first()
             )
 
+    def get_by_idx(self, response_plan_idx: int) -> ResponsePlan | None:
+        with self.session_factory() as db:
+            return (
+                db.query(ResponsePlan)
+                .filter(ResponsePlan.idx == response_plan_idx)
+                .first()
+            )
+
     def approve(self, response_plan_idx: int) -> ResponsePlan:
         with self.session_factory() as db:
             response_plan = self._get_response_plan_or_raise(db, response_plan_idx)
