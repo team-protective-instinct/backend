@@ -1,7 +1,7 @@
 from dataclasses import asdict
 from typing import Callable, cast
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import RagPlaybook
 from app.rag.embeddings import embed_query
@@ -22,7 +22,12 @@ class PlaybookService:
 
     def get_playbook_by_idx(self, playbook_idx: int) -> RagPlaybook | None:
         with self.session_factory() as db:
-            return db.query(RagPlaybook).filter(RagPlaybook.idx == playbook_idx).first()
+            return (
+                db.query(RagPlaybook)
+                .options(selectinload(RagPlaybook.chunks))
+                .filter(RagPlaybook.idx == playbook_idx)
+                .first()
+            )
 
     def retrieve_relevant_chunks(
         self,

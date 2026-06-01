@@ -15,6 +15,11 @@ from .rag_schema import (
     PlaybookIndexError,
     PlaybookRetrievalResult,
 )
+from .playbook_schema import (
+    PlaybookChunkResponse,
+    PlaybookDetailResponse,
+    PlaybookListItemResponse,
+)
 from .response_plan_schema import (
     ResponsePlanActionGeneration,
     ResponsePlanActionResponse,
@@ -37,6 +42,9 @@ __all__ = [
     "PlaybookChunk",
     "PlaybookIndexError",
     "PlaybookRetrievalResult",
+    "PlaybookChunkResponse",
+    "PlaybookDetailResponse",
+    "PlaybookListItemResponse",
     "ResponsePlanDenyRequest",
     "ResponsePlanActionGeneration",
     "ResponsePlanActionResponse",
