@@ -12,6 +12,7 @@ from app.core.exception_handlers import (
 from app.controllers import (
     webhook_controller,
     incident_controller,
+    playbook_controller,
     response_plan_controller,
 )
 
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
         modules=[
             webhook_controller,
             incident_controller,
+            playbook_controller,
             response_plan_controller,
         ]
     )
@@ -58,6 +60,7 @@ def create_app() -> FastAPI:
     # Register routers
     app.include_router(webhook_controller.router)
     app.include_router(incident_controller.router)
+    app.include_router(playbook_controller.router)
     app.include_router(response_plan_controller.router)
 
     return app
