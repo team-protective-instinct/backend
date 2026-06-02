@@ -69,6 +69,7 @@ class Container(containers.DeclarativeContainer):
         threat_agent=threat_agent,
         response_plan_agent=response_plan_agent,
         playbook_service=playbook_service,
+        raw_log_service=incident_raw_log_service,
     )
 
     incident_service = providers.Factory(

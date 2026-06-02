@@ -7,7 +7,7 @@ from sqlalchemy import String, cast as sql_cast, func, or_
 from sqlalchemy.orm import Session
 
 from app.dtos import IncidentListResult, IncidentSummaryResult, IncidentWithReport
-from app.models import Incident, IncidentRawLog, IncidentReport
+from app.models import Incident, IncidentReport
 from app.models.constants import (
     IncidentAnalysisStatus,
     IncidentResponsePlanStatus,
@@ -36,7 +36,6 @@ class IncidentService:
         self,
         title: str,
         severity: str | None,
-        evidence_logs: str,
         raw_payload: dict[str, object],
     ) -> Incident:
         incident = Incident(
@@ -56,7 +55,6 @@ class IncidentService:
             self.raw_log_service.create_for_incident_in_session(
                 db=db,
                 incident_idx=incident.idx,
-                evidence_logs=evidence_logs,
                 raw_payload=raw_payload,
             )
             db.commit()
@@ -204,15 +202,12 @@ class IncidentService:
                     pattern = f"%{keyword}%"
                     query = query.outerjoin(
                         IncidentReport, IncidentReport.incident_idx == Incident.idx
-                    ).outerjoin(
-                        IncidentRawLog, IncidentRawLog.incident_idx == Incident.idx
                     )
                     query = query.filter(
                         or_(
                             IncidentReport.attack_type.ilike(pattern),
                             IncidentReport.attacker_ip.ilike(pattern),
                             IncidentReport.analysis_summary.ilike(pattern),
-                            IncidentRawLog.evidence_logs.ilike(pattern),
                             sql_cast(IncidentReport.analysis_result, String).ilike(
                                 pattern
                             ),

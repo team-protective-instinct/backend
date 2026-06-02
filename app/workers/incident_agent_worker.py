@@ -55,7 +55,8 @@ class IncidentAgentWorker:
                     thread_id,
                     analysis,
                 ) = await self.ai_invoker_service.generate_incident_reports(
-                    raw_log.evidence_logs
+                    incident.idx,
+                    raw_log.raw_payload,
                 )
                 self.incident_service.mark_analysis_succeeded(
                     incident_idx=incident.idx,
