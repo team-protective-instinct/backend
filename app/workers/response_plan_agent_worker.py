@@ -4,7 +4,6 @@ import logging
 from app.core.container import Container
 from app.services.ai_invoker_service import AiInvokerService
 from app.services.incident_service import IncidentService
-from app.services.incident_raw_log_service import IncidentRawLogService
 from app.services.incident_report_service import IncidentReportService
 from app.services.response_plan_service import ResponsePlanService
 
@@ -22,7 +21,6 @@ class ResponsePlanAgentWorker:
     def __init__(
         self,
         incident_service: IncidentService,
-        raw_log_service: IncidentRawLogService,
         report_service: IncidentReportService,
         response_plan_service: ResponsePlanService,
         ai_invoker_service: AiInvokerService,
@@ -30,7 +28,6 @@ class ResponsePlanAgentWorker:
         poll_interval_seconds: int = 5,
     ):
         self.incident_service = incident_service
-        self.raw_log_service = raw_log_service
         self.report_service = report_service
         self.response_plan_service = response_plan_service
         self.ai_invoker_service = ai_invoker_service
@@ -58,12 +55,10 @@ class ResponsePlanAgentWorker:
                 report = self.report_service.get_latest_by_incident(incident.idx)
                 if report is None:
                     raise RuntimeError("Incident report not found")
-                raw_log = self.raw_log_service.get_latest_by_incident(incident.idx)
                 thread_id, generation_result = (
                     await self.ai_invoker_service.generate_incident_response_plan(
                         incident,
                         report,
-                        raw_log.evidence_logs if raw_log is not None else "",
                     )
                 )
                 self.response_plan_service.create_from_generation_result(
@@ -86,7 +81,6 @@ async def main() -> None:
     try:
         worker = ResponsePlanAgentWorker(
             incident_service=container.incident_service(),
-            raw_log_service=container.incident_raw_log_service(),
             report_service=container.incident_report_service(),
             response_plan_service=container.response_plan_service(),
             ai_invoker_service=container.ai_invoker_service(),

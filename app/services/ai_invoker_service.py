@@ -118,7 +118,7 @@ class AiInvokerService:
         return "\n".join(part for part in parts if part.strip())
 
     def _build_agent_context_for_incident_report(
-        self, incident: Incident, report: IncidentReport, raw_log: str
+        self, incident: Incident, report: IncidentReport
     ) -> dict[str, object]:
         analysis = (
             report.analysis_result if isinstance(report.analysis_result, dict) else {}
@@ -136,7 +136,6 @@ class AiInvokerService:
             "suspicious_payloads": self._get_string_list(
                 analysis, "suspicious_payloads"
             ),
-            "raw_log": raw_log[:6000],
             "created_at": incident.created_at.isoformat(),
         }
 
