@@ -22,7 +22,7 @@ class IndicatorEvaluation(BaseModel):
 
     name: IndicatorName = Field(description="Select from the pre-defined indicator names") # 정의된 지표 명칭 중 선택
     is_detected: bool = Field(description="Whether this indicator was detected in the logs") # 해당 지표의 탐지 여부 (로그상 참/거짓)
-    reasoning: Annotated[str, StringConstraints(max_length=500)] = Field(description="One concise sentence with log evidence (max 500 chars)") # 해당 판단에 대한 구체적 로그 근거
+    reasoning: Annotated[str, StringConstraints(max_length=500)] = Field(description="One concise sentence with log evidence (max 500 chars). Write this in Korean.") # 해당 판단에 대한 구체적 로그 근거
 
 
 SeverityLevel = Literal["critical", "high", "medium", "low"]
@@ -40,9 +40,9 @@ class AnalysisReport(BaseModel):
     # --- [Step 2: Summary & Classification] ---
     analysis_summary: str = Field(
         max_length=500,
-        description="A concise reasoning that explains the verdict (max 2 sentences, 500 chars)"
+        description="A concise reasoning that explains the verdict (max 2 sentences, 500 chars). Write this in Korean."
     ) # 검토된 지표들을 종합하여 정오탐 이유를 짧게 설명하는 요약
-    attack_type: str = Field(description="Name of the attack type (e.g., SQL Injection, Brute Force)") # 공격 유형 명칭
+    attack_type: str = Field(description="Name of the attack type (e.g., SQL Injection, Brute Force). Write the label in Korean when possible.") # 공격 유형 명칭
     severity: SeverityLevel = Field(
         description=(
             "Overall severity of this incident. "
@@ -57,7 +57,7 @@ class AnalysisReport(BaseModel):
     key_indicators: List[IndicatorEvaluation] = Field(
         min_length=1,
         max_length=4,
-        description="Up to 4 key indicators used for analysis. Irrelevant indicators can be omitted."
+        description="Up to 4 key indicators used for analysis. Irrelevant indicators can be omitted. Keep the reasoning in Korean."
     ) # 분석에 사용된 주요 지표 목록
     attack_ip: str | None = Field(
         default=None,
