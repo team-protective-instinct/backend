@@ -22,6 +22,11 @@ class IncidentResponsePlanStatus(str, Enum):
     FAILED = "failed"
 
 
+class IncidentRawLogSourceType(str, Enum):
+    WEBHOOK = "webhook"
+    ELASTICSEARCH_MCP = "elasticsearch_mcp"
+
+
 class ResponsePlanStatus(str, Enum):
     PENDING = "pending"
     APPROVED = "approved"
