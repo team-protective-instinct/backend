@@ -1,4 +1,5 @@
 from datetime import datetime
+from collections.abc import Sequence
 from typing import Literal, TYPE_CHECKING
 
 from enum import Enum
@@ -106,7 +107,7 @@ class IncidentDetailResponse(BaseModel):
     suspicious_payloads: list[str] = Field(default_factory=list)
     analysis_summary: str
     key_indicators: list[IncidentKeyIndicatorResponse] = Field(default_factory=list)
-    raw_log: str
+    raw_logs: list["IncidentRawLogResponse"] = Field(default_factory=list)
     response_plan: ResponsePlanResponse | None = None
 
     @classmethod
@@ -114,7 +115,7 @@ class IncidentDetailResponse(BaseModel):
         cls,
         incident: "Incident",
         report: "IncidentReport | None" = None,
-        raw_log: "IncidentRawLog | None" = None,
+        raw_logs: Sequence["IncidentRawLog"] | None = None,
         response_plan: "ResponsePlan | None" = None,
     ) -> "IncidentDetailResponse":
         analysis = (
@@ -184,10 +185,29 @@ class IncidentDetailResponse(BaseModel):
             if report and report.analysis_summary
             else "",
             key_indicators=key_indicators,
-            raw_log=raw_log.evidence_logs if raw_log is not None else "",
+            raw_logs=[
+                IncidentRawLogResponse.from_raw_log(raw_log)
+                for raw_log in raw_logs or []
+            ],
             response_plan=ResponsePlanResponse.from_response_plan(response_plan)
             if response_plan is not None
             else None,
+        )
+
+
+class IncidentRawLogResponse(BaseModel):
+    idx: int
+    source_type: str
+    raw_payload: dict[str, object] | None = None
+    created_at: datetime
+
+    @classmethod
+    def from_raw_log(cls, raw_log: "IncidentRawLog") -> "IncidentRawLogResponse":
+        return cls(
+            idx=raw_log.idx,
+            source_type=raw_log.source_type,
+            raw_payload=raw_log.raw_payload,
+            created_at=raw_log.created_at,
         )
 
 

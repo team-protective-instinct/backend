@@ -92,10 +92,10 @@ def get_incident_by_idx(
 
     response_plan = response_plan_service.get_by_incident(incident_idx)
     report = report_service.get_latest_by_incident(incident_idx)
-    raw_log = raw_log_service.get_latest_by_incident(incident_idx)
+    raw_logs = raw_log_service.get_by_incident(incident_idx)
     return IncidentDetailResponse.from_incident(
         result,
         report=report,
-        raw_log=raw_log,
+        raw_logs=raw_logs,
         response_plan=response_plan,
     )
