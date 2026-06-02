@@ -11,11 +11,11 @@ class ResponsePlanActionGeneration(BaseModel):
     execution_order: int = Field(ge=1, description="Order in which to execute this action")
     tool_name: str = Field(description="Victim MCP tool name to execute")
     arguments: dict[str, Any] = Field(default_factory=dict, description="Tool arguments")
-    reason: str = Field(description="Why this action should be executed")
+    reason: str = Field(description="Why this action should be executed. Write this in Korean.")
 
 
 class ResponsePlanGenerationResult(BaseModel):
-    summary: str = Field(description="Concise response plan summary")
+    summary: str = Field(description="Concise response plan summary. Write this in Korean.")
     actions: list[ResponsePlanActionGeneration] = Field(
         default_factory=list,
         description="Victim MCP defense actions to persist and execute",
