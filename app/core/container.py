@@ -47,13 +47,6 @@ class Container(containers.DeclarativeContainer):
         session_factory=db.provided.session,
     )
 
-    response_plan_action_executor = providers.Factory(
-        ResponsePlanActionExecutor,
-        action_service=response_plan_action_service,
-        response_plan_service=response_plan_service,
-        settings=config,
-    )
-
     incident_raw_log_service = providers.Factory(
         IncidentRawLogService,
         session_factory=db.provided.session,
@@ -77,4 +70,12 @@ class Container(containers.DeclarativeContainer):
         session_factory=db.provided.session,
         raw_log_service=incident_raw_log_service,
         report_service=incident_report_service,
+    )
+
+    response_plan_action_executor = providers.Factory(
+        ResponsePlanActionExecutor,
+        action_service=response_plan_action_service,
+        response_plan_service=response_plan_service,
+        incident_service=incident_service,
+        settings=config,
     )

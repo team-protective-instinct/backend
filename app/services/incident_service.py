@@ -7,7 +7,7 @@ from sqlalchemy import String, cast as sql_cast, func, or_
 from sqlalchemy.orm import Session
 
 from app.dtos import IncidentListResult, IncidentSummaryResult, IncidentWithReport
-from app.models import Incident, IncidentReport
+from app.models import Incident, IncidentReport, ResponsePlan
 from app.models.constants import (
     IncidentAnalysisStatus,
     IncidentResponsePlanStatus,
@@ -167,6 +167,20 @@ class IncidentService:
                 else IncidentResponsePlanStatus.PENDING.value
             )
             incident.response_plan_last_error = str(error)
+            db.commit()
+
+    def mark_resolved_for_executed_response_plan(self, response_plan_idx: int) -> None:
+        with self.session_factory() as db:
+            response_plan = (
+                db.query(ResponsePlan)
+                .filter(ResponsePlan.idx == response_plan_idx)
+                .first()
+            )
+            if response_plan is None:
+                raise ValueError("Response plan not found")
+
+            incident = self._get_incident_or_raise(db, response_plan.incident_idx)
+            incident.status = IncidentStatus.RESOLVED.value
             db.commit()
 
     def get_pending_incidents(self) -> list[IncidentWithReport]:
