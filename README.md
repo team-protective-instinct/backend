@@ -99,17 +99,16 @@ ELASTICSEARCH_MCP_REQUEST_TIMEOUT_SECONDS=10
 
 #### Victim MCP 설정
 
-response plan agent가 victim 시스템의 추가 컨텍스트를 조회할 수 있습니다. 기본값은 비활성화이며, 필요할 때만 켭니다.
+response plan agent가 victim 시스템의 MCP 도구를 대응 조치 후보로 제안하고, 승인 후 checkpoint된 LangGraph thread를 재개해 실행할 수 있습니다. `VICTIM_MCP_URL`이 가리키는 서버가 항상 사용됩니다.
 
 ```bash
-VICTIM_MCP_ENABLED=false
 VICTIM_MCP_URL=http://localhost:9001/mcp
 VICTIM_MCP_REQUEST_TIMEOUT_SECONDS=10
 VICTIM_MCP_MAX_RESULT_CHARS=6000
 ```
 
-- `VICTIM_MCP_ENABLED`: Victim MCP 컨텍스트 조회 사용 여부
-- `VICTIM_MCP_URL`: Victim MCP 서버 주소
+- `VICTIM_MCP_URL`: 단일 Victim MCP 서버 주소
+- response plan agent는 단일 서버에서 발견한 Victim MCP tool을 bound tool로 사용해 대응 조치를 제안합니다. 승인된 조치는 checkpoint된 LangGraph thread resume을 통해 실행되며, tool/MCP 호출 과정에서 schema 및 runtime validation이 수행됩니다.
 - `VICTIM_MCP_REQUEST_TIMEOUT_SECONDS`: MCP 응답 대기 시간
 - `VICTIM_MCP_MAX_RESULT_CHARS`: MCP 응답에서 사용할 최대 문자 수
 

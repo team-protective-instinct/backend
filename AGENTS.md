@@ -52,8 +52,9 @@ FastAPI backend for receiving ElastAlert webhooks, storing incidents/raw logs, r
 ## MCP integrations
 
 - Elasticsearch MCP settings: `ELASTICSEARCH_MCP_ENABLED`, `ELASTICSEARCH_MCP_URL`, `ELASTICSEARCH_MCP_ALLOWED_INDEX_PATTERN`, `ELASTICSEARCH_MCP_SERVICE_FIELD`, `ELASTICSEARCH_MCP_SERVICE_VALUE`, `ELASTICSEARCH_MCP_MAX_RESULTS`, `ELASTICSEARCH_MCP_MAX_WINDOW_MINUTES`, `ELASTICSEARCH_MCP_REQUEST_TIMEOUT_SECONDS`.
-- Victim MCP settings: `VICTIM_MCP_ENABLED`, `VICTIM_MCP_URL`, `VICTIM_MCP_REQUEST_TIMEOUT_SECONDS`, `VICTIM_MCP_MAX_RESULT_CHARS`.
-- Both MCP integrations are disabled by default; enable only with reachable local services.
+- Victim MCP settings: `VICTIM_MCP_URL`, `VICTIM_MCP_REQUEST_TIMEOUT_SECONDS`, `VICTIM_MCP_MAX_RESULT_CHARS`.
+- Victim MCP uses exactly one server from `VICTIM_MCP_URL`; response-plan generation binds dynamically discovered MCP tools for tool-call proposals, and approved tools execute later by resuming the checkpointed LangGraph thread. Tool/MCP invocation performs schema and runtime validation.
+- Only the Elasticsearch MCP integration is gated by a default-disabled `ELASTICSEARCH_MCP_ENABLED` flag. Victim MCP is always available through `VICTIM_MCP_URL`.
 
 ## Database and migrations
 
