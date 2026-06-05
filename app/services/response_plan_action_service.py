@@ -23,6 +23,15 @@ class ResponsePlanActionService:
             )
             return [action.idx for action in actions]
 
+    def get_by_idx(self, action_idx: int) -> ResponsePlanAction | None:
+        with self.session_factory() as db:
+            return (
+                db.query(ResponsePlanAction)
+                .filter(ResponsePlanAction.idx == action_idx)
+                .first()
+            )
+
+
     def update_status(
         self,
         action_idx: int,

@@ -3,20 +3,25 @@ from contextlib import AbstractAsyncContextManager
 from typing import cast
 
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import BaseTool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import ToolNode
 
 from app.core.config import Settings
 
 from .constants import ResponsePlanNodeName
-from .nodes import generate_response_plan
+from .nodes import agent_node, should_continue, summarize_node
 from .state import ResponsePlanState
+from .tools import VictimMCPToolProvider
 
 
 class ResponsePlanAgent:
     def __init__(self, settings: Settings):
         self.settings = settings
+        self.mcp_tools = VictimMCPToolProvider(settings)
+        self._tools: list[BaseTool] = []
         self._initialize_lock = asyncio.Lock()
         self._initialized = False
         self.graph: CompiledStateGraph | None = None
@@ -31,6 +36,8 @@ class ResponsePlanAgent:
         async with self._initialize_lock:
             if self._initialized:
                 return
+            await self.mcp_tools.initialize()
+            self._tools = self.mcp_tools.tools
             await self._open_checkpointer()
             try:
                 self.graph = self._build_graph()
@@ -40,18 +47,42 @@ class ResponsePlanAgent:
             self._initialized = True
 
     def _build_graph(self) -> CompiledStateGraph:
-        async def generate_plan_node(state: object):
-            return await generate_response_plan(cast(ResponsePlanState, state))
+        tools = self._tools
+
+        async def run_agent_node(state: object):
+            return await agent_node(cast(ResponsePlanState, state), tools)
+
+        async def run_summarize_node(state: object):
+            return await summarize_node(cast(ResponsePlanState, state))
+
+        def route_after_agent(state: object) -> str:
+            return should_continue(cast(ResponsePlanState, state))
 
         workflow = StateGraph(ResponsePlanState)
-        workflow.add_node(ResponsePlanNodeName.GENERATE_PLAN, generate_plan_node)
-        workflow.add_edge(START, ResponsePlanNodeName.GENERATE_PLAN)
-        workflow.add_edge(ResponsePlanNodeName.GENERATE_PLAN, END)
+        workflow.add_node(ResponsePlanNodeName.AGENT, run_agent_node)
+        workflow.add_node(ResponsePlanNodeName.TOOLS, ToolNode(tools))
+        workflow.add_node(ResponsePlanNodeName.SUMMARIZE, run_summarize_node)
+
+        workflow.add_edge(START, ResponsePlanNodeName.AGENT)
+        workflow.add_conditional_edges(
+            ResponsePlanNodeName.AGENT,
+            route_after_agent,
+            {
+                "tools": ResponsePlanNodeName.TOOLS,
+                END: END,
+            },
+        )
+        workflow.add_edge(ResponsePlanNodeName.TOOLS, ResponsePlanNodeName.SUMMARIZE)
+        workflow.add_edge(ResponsePlanNodeName.SUMMARIZE, END)
 
         if self._checkpointer is None:
             raise RuntimeError("ResponsePlanAgent checkpointer was not initialized")
 
-        return workflow.compile(checkpointer=self._checkpointer)
+        # Compile graph with interrupt before tools
+        return workflow.compile(
+            interrupt_before=[ResponsePlanNodeName.TOOLS],
+            checkpointer=self._checkpointer,
+        )
 
     async def _open_checkpointer(self) -> None:
         if self._checkpointer is not None:
