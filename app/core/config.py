@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     VICTIM_MCP_REQUEST_TIMEOUT_SECONDS: int = Field(default=10)
     VICTIM_MCP_MAX_RESULT_CHARS: int = Field(default=6000)
 
+    # Expo Push Service settings for SOC mobile notifications.
+    EXPO_PUSH_ENABLED: bool = Field(default=True)
+    EXPO_PUSH_URL: str = Field(default="https://exp.host/--/api/v2/push/send")
+    EXPO_PUSH_ACCESS_TOKEN: str | None = Field(default=None)
+    EXPO_PUSH_REQUEST_TIMEOUT_SECONDS: int = Field(default=10)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

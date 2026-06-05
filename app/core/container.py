@@ -12,6 +12,8 @@ from app.services.response_plan_action_executor import ResponsePlanActionExecuto
 from app.services.ai_invoker_service import AiInvokerService
 from app.services.incident_raw_log_service import IncidentRawLogService
 from app.services.incident_report_service import IncidentReportService
+from app.services.notification_service import NotificationService
+from app.services.push_token_service import PushTokenService
 
 
 class Container(containers.DeclarativeContainer):
@@ -55,6 +57,17 @@ class Container(containers.DeclarativeContainer):
     incident_report_service = providers.Factory(
         IncidentReportService,
         session_factory=db.provided.session,
+    )
+
+    push_token_service = providers.Factory(
+        PushTokenService,
+        session_factory=db.provided.session,
+    )
+
+    notification_service = providers.Factory(
+        NotificationService,
+        settings=config,
+        push_token_service=push_token_service,
     )
 
     ai_invoker_service = providers.Factory(
