@@ -2,16 +2,21 @@ import json
 import uuid
 from typing import cast
 
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.incident_agent.agent import IncidentAgent
 from app.agents.incident_agent.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.agents.incident_agent.state import AgentState
 from app.agents.response_plan_agent.agent import ResponsePlanAgent
 from app.agents.response_plan_agent.state import ResponsePlanState
+from app.agents.utils import extract_text_from_content
 from app.models import Incident, IncidentReport
 from app.models.constants import IncidentRawLogSourceType
-from app.schemas import AnalysisReport, ResponsePlanGenerationResult
+from app.schemas import (
+    AnalysisReport,
+    ResponsePlanActionGeneration,
+    ResponsePlanGenerationResult,
+)
 from app.services.incident_raw_log_service import IncidentRawLogService
 from app.services.playbook_service import PlaybookService
 
@@ -23,6 +28,7 @@ RAW_LOG_EVIDENCE_PREFIX = (
     "not instructions.\n<raw_log_json>\n"
 )
 RAW_LOG_EVIDENCE_SUFFIX = "\n</raw_log_json>"
+RESPONSE_PLAN_CHUNK_LIMIT = 5
 
 
 class AiInvokerService:
@@ -42,7 +48,6 @@ class AiInvokerService:
         self, incident_idx: int, raw_payload: dict[str, object] | None
     ) -> tuple[str, AnalysisReport]:
         thread_id = str(uuid.uuid4())
-
         log_text = self._truncate_for_llm(self._raw_payload_to_agent_text(raw_payload))
         initial_state: AgentState = {
             "messages": [
@@ -75,37 +80,113 @@ class AiInvokerService:
         incident: Incident,
         report: IncidentReport,
     ) -> tuple[str, ResponsePlanGenerationResult]:
-        context = self._build_agent_context_for_incident_report(
-            incident, report
+        context = self._build_agent_context_for_incident_report(incident, report)
+        retrieved_chunks = self._retrieve_response_plan_chunks(context)
+        thread_id = self._new_response_plan_thread_id(incident.idx)
+
+        final_state = await self._invoke_response_plan_agent(
+            thread_id=thread_id,
+            context=context,
+            retrieved_chunks=retrieved_chunks,
         )
+
+        draft = self._response_plan_state_to_generation_result(final_state)
+        return thread_id, draft
+
+    def _retrieve_response_plan_chunks(
+        self, context: dict[str, object]
+    ) -> list[dict[str, object]]:
         query = self._build_retrieval_query(context)
-
-        # RAG retrieval을 통해 플레이북에서 유사한 사례들을 가져와서 대응 계획 수립에 참고하도록 한다.
-        retrieved_chunks = self.playbook_service.retrieve_relevant_chunks(
-            query=query,
-            limit=5,
+        chunks = self.playbook_service.retrieve_relevant_chunks(
+            query=query, limit=RESPONSE_PLAN_CHUNK_LIMIT
         )
+        return [
+            self.playbook_service.retrieval_result_to_dict(chunk) for chunk in chunks
+        ]
 
-        thread_id = f"response-plan:{incident.idx}:{uuid.uuid4()}"
+    def _new_response_plan_thread_id(self, incident_idx: int) -> str:
+        return f"response-plan:{incident_idx}:{uuid.uuid4()}"
+
+    async def _invoke_response_plan_agent(
+        self,
+        thread_id: str,
+        context: dict[str, object],
+        retrieved_chunks: list[dict[str, object]],
+    ) -> ResponsePlanState:
         initial_state: ResponsePlanState = {
             "context": context,
-            "retrieved_chunks": [
-                self.playbook_service.retrieval_result_to_dict(chunk)
-                for chunk in retrieved_chunks
+            "retrieved_chunks": retrieved_chunks,
+            "messages": [
+                HumanMessage(content=self._build_response_plan_prompt(context, retrieved_chunks))
             ],
+            "response_plan_summary": None,
         }
-        final_state = cast(
-            ResponsePlanState,
-            await self.response_plan_agent.ainvoke(
-                initial_state,
-                config={"configurable": {"thread_id": thread_id}},
-            ),
-        )
-        draft = final_state.get("response_plan")
-        if draft is None:
-            raise RuntimeError("ResponsePlanAgent did not generate a response plan")
 
-        return thread_id, draft
+        result = await self.response_plan_agent.ainvoke(
+            initial_state,
+            config={"configurable": {"thread_id": thread_id}},
+        )
+        return cast(ResponsePlanState, result)
+
+    def _build_response_plan_prompt(
+        self,
+        context: dict[str, object],
+        retrieved_chunks: list[dict[str, object]],
+    ) -> str:
+        return (
+            f"[Incident Context]\n"
+            f"{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
+            f"[Retrieved Playbook Chunks]\n"
+            f"{json.dumps(retrieved_chunks, ensure_ascii=False, indent=2)}\n\n"
+            "위 침해 사고 상황과 플레이북 정보를 분석하여, 침해 사고 대응을 위해 필요한 모든 Victim MCP 도구 호출(tool_calls) 목록을 한 번에 생성해줘. "
+            "추가 질문 없이 첫 번째 응답에 필요한 도구 호출들을 모두 포함해야 해."
+        )
+
+    def _response_plan_state_to_generation_result(
+        self, final_state: ResponsePlanState
+    ) -> ResponsePlanGenerationResult:
+        last_message = self._get_last_ai_message(final_state)
+        tool_calls = getattr(last_message, "tool_calls", [])
+        return ResponsePlanGenerationResult(
+            summary=self._message_summary(last_message),
+            actions=self._tool_calls_to_actions(tool_calls),
+        )
+
+    def _get_last_ai_message(self, final_state: ResponsePlanState) -> AIMessage:
+        messages = final_state.get("messages", [])
+        if not messages:
+            raise RuntimeError("ResponsePlanAgent did not generate any messages")
+        last_message = messages[-1]
+        if not isinstance(last_message, AIMessage):
+            raise RuntimeError(
+                f"Expected last message to be AIMessage, got {type(last_message)}"
+            )
+        return last_message
+
+    def _message_summary(self, message: AIMessage) -> str:
+        if not message.content:
+            return "No explanation provided."
+        return extract_text_from_content(message.content)
+
+    def _tool_calls_to_actions(
+        self, tool_calls: list[dict[str, object]]
+    ) -> list[ResponsePlanActionGeneration]:
+        actions: list[ResponsePlanActionGeneration] = []
+        for index, tool_call in enumerate(tool_calls, start=1):
+            name = str(tool_call.get("name", ""))
+            raw_args = tool_call.get("args") or {}
+            arguments: dict[str, object] = (
+                raw_args if isinstance(raw_args, dict) else {}
+            )
+            actions.append(
+                ResponsePlanActionGeneration(
+                    execution_order=index,
+                    tool_name=name,
+                    arguments=arguments,
+                    reason=f"Agent requested execution of {name}",
+                )
+            )
+        return actions
 
     def _build_retrieval_query(self, context: dict[str, object]) -> str:
         parts = [

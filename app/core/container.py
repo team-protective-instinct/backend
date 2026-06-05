@@ -90,5 +90,5 @@ class Container(containers.DeclarativeContainer):
         action_service=response_plan_action_service,
         response_plan_service=response_plan_service,
         incident_service=incident_service,
-        settings=config,
+        response_plan_agent=response_plan_agent,
     )
