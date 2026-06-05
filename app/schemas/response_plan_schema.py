@@ -58,6 +58,7 @@ class ResponsePlanResponse(BaseModel):
     incident_idx: int
     thread_id: str | None
     summary: str
+    execution_result: str | None = None
     status: str
     denied_reason: str | None
     actions: list[ResponsePlanActionResponse]
@@ -71,6 +72,7 @@ class ResponsePlanResponse(BaseModel):
             incident_idx=response_plan.incident_idx,
             thread_id=response_plan.thread_id,
             summary=response_plan.summary,
+            execution_result=response_plan.execution_result,
             status=response_plan.status,
             denied_reason=response_plan.denied_reason,
             actions=[

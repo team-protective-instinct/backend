@@ -22,6 +22,7 @@ class ResponsePlan(Base):
     )
     thread_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
+    execution_result: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True, default=ResponsePlanStatus.PENDING
     )
