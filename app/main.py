@@ -14,6 +14,7 @@ from app.controllers import (
     incident_controller,
     playbook_controller,
     response_plan_controller,
+    push_token_controller,
 )
 
 # Configure logging
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
             incident_controller,
             playbook_controller,
             response_plan_controller,
+            push_token_controller,
         ]
     )
 
@@ -62,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(incident_controller.router)
     app.include_router(playbook_controller.router)
     app.include_router(response_plan_controller.router)
+    app.include_router(push_token_controller.router)
 
     return app
 

@@ -27,16 +27,17 @@ FastAPI backend for receiving ElastAlert webhooks, storing incidents/raw logs, r
 - Docker Compose uses `pgvector/pgvector:pg16` on `${DB_PORT}:5432`; data persists under gitignored `postgres_data/`.
 - LLM provider is selected by `LLM_PROVIDER`. Code supports aliases including `gemini`, `anthropic`/`claude`, and `openai`/`gpt`, plus the matching API key.
 - RAG embeddings use `RAG_EMBEDDING_MODEL`; current pgvector playbook chunks expect 1536-dimensional embeddings.
+- Expo push notifications use `EXPO_PUSH_ENABLED`, `EXPO_PUSH_URL`, optional `EXPO_PUSH_ACCESS_TOKEN`, and `EXPO_PUSH_REQUEST_TIMEOUT_SECONDS`; completed response plans notify active `push_tokens` rows when enabled.
 
 ## Architecture map
 
-- FastAPI entrypoint is `app.main:app`; `create_app()` wires DI, calls `db.create_database()`, and includes `/webhook`, `/incidents`, `/playbooks`, and response-plan routes.
+- FastAPI entrypoint is `app.main:app`; `create_app()` wires DI, calls `db.create_database()`, and includes `/webhook`, `/incidents`, `/playbooks`, response-plan routes, and `/push-tokens`.
 - CORS in `app/main.py` allows only `http://localhost:8081` and `http://127.0.0.1:8081`.
 - DI lives in `app/core/container.py`:
   - singleton `Database`
   - singleton `IncidentAgent` as `threat_agent`
   - singleton `ResponsePlanAgent`
-  - factory services for playbooks, incidents, raw logs, reports, response plans, actions, action execution, and AI invocation.
+  - factory services for playbooks, incidents, raw logs, reports, response plans, actions, action execution, push tokens, push notifications, and AI invocation.
 - SQLAlchemy `Base` and session context manager live in `app/core/database.py`; service methods should use `with self.session_factory() as db` so rollback/close behavior is preserved.
 - Workers poll persisted incidents/response-plan state and invoke agents outside the webhook request path.
 - RAG playbooks live in `playbooks/*.md` and are indexed into `rag_playbooks` / `rag_playbook_chunks` tables by `app.scripts.index_playbooks`.
