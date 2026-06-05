@@ -1,20 +1,18 @@
 import asyncio
 import logging
-from importlib import import_module
 from collections.abc import Sequence
+from importlib import import_module
 from typing import cast
 
 from langchain_core.tools import BaseTool
 
 from app.core.config import Settings
 
-from .victim_mcp_tool import ALLOWED_VICTIM_MCP_ACTIONS
-
 logger = logging.getLogger(__name__)
 
 
 class VictimMCPToolProvider:
-    """Loads Victim MCP tools and exposes safe response-planning wrappers."""
+    """Loads Victim MCP tools and exposes discovered executable tools."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -32,10 +30,6 @@ class VictimMCPToolProvider:
         async with self._lock:
             if self._initialized:
                 return
-            if not self.settings.VICTIM_MCP_ENABLED:
-                logger.info("Victim MCP disabled for response plan agent")
-                self._initialized = True
-                return
 
             try:
                 loaded_tools = await self._load_tools()
@@ -48,38 +42,21 @@ class VictimMCPToolProvider:
                 self._initialized = True
                 return
 
-            action_tools = [
-                tool
-                for tool in loaded_tools
-                if self._base_tool_name(tool.name) in ALLOWED_VICTIM_MCP_ACTIONS
-            ]
             loaded_tool_names = [tool.name for tool in loaded_tools]
-            missing_tools = sorted(
-                ALLOWED_VICTIM_MCP_ACTIONS
-                - {self._base_tool_name(tool.name) for tool in action_tools}
-            )
-            if missing_tools:
+            if not loaded_tools:
                 logger.warning(
-                    "Victim MCP defense tools missing; missing=%s loaded=%s",
-                    missing_tools,
-                    loaded_tool_names,
-                )
-
-            if not action_tools:
-                loaded_tool_names = [tool.name for tool in loaded_tools]
-                logger.warning(
-                    "No executable Victim MCP defense tools found; loaded tools=%s",
+                    "No Victim MCP tools discovered; loaded tools=%s",
                     loaded_tool_names,
                 )
                 self._tools = []
                 self._initialized = True
                 return
 
-            self._tools = action_tools
+            self._tools = list(loaded_tools)
             self._initialized = True
             logger.info(
                 "Victim MCP response-plan execution enabled with tools=%s",
-                [tool.name for tool in action_tools],
+                [tool.name for tool in loaded_tools],
             )
 
     async def _load_tools(self) -> Sequence[BaseTool]:
@@ -91,8 +68,7 @@ class VictimMCPToolProvider:
                     "transport": "http",
                     "url": self.settings.VICTIM_MCP_URL,
                 }
-            },
-            tool_name_prefix=True,
+            }
         )
         return cast(
             Sequence[BaseTool],
@@ -101,11 +77,3 @@ class VictimMCPToolProvider:
                 timeout=self.settings.VICTIM_MCP_REQUEST_TIMEOUT_SECONDS,
             ),
         )
-
-    def _base_tool_name(self, tool_name: str) -> str:
-        name = tool_name.lower()
-        if name.startswith("victim__"):
-            return name.removeprefix("victim__")
-        if name.startswith("victim_"):
-            return name.removeprefix("victim_")
-        return name
