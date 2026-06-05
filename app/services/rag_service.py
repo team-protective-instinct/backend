@@ -1,8 +1,8 @@
 import json
-from collections.abc import Mapping
 from typing import cast
 
 from sqlalchemy import text
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
 from app.models import RagPlaybook
@@ -128,7 +128,7 @@ def retrieve_playbook_chunks(
     return [retrieval_result_from_row(row) for row in rows]
 
 
-def retrieval_result_from_row(row: Mapping[str, object]) -> PlaybookRetrievalResult:
+def retrieval_result_from_row(row: RowMapping) -> PlaybookRetrievalResult:
     section = row["section"]
     return PlaybookRetrievalResult(
         playbook_id=int(row["playbook_id"]),
