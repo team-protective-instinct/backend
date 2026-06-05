@@ -9,6 +9,7 @@ from app.agents.response_plan_agent.tools import (
 )
 from app.core.config import Settings
 from app.models.constants import ResponsePlanActionStatus, ResponsePlanStatus
+from app.services.incident_service import IncidentService
 from app.services.response_plan_action_service import ResponsePlanActionService
 from app.services.response_plan_service import ResponsePlanService
 
@@ -20,10 +21,12 @@ class ResponsePlanActionExecutor:
         self,
         action_service: ResponsePlanActionService,
         response_plan_service: ResponsePlanService,
+        incident_service: IncidentService,
         settings: Settings,
     ):
         self.action_service = action_service
         self.response_plan_service = response_plan_service
+        self.incident_service = incident_service
         self.settings = settings
         self.mcp_tools = VictimMCPToolProvider(settings)
 
@@ -32,6 +35,9 @@ class ResponsePlanActionExecutor:
         if not pending_actions:
             self.response_plan_service.update_status(
                 response_plan_idx, ResponsePlanStatus.EXECUTED.value
+            )
+            self.incident_service.mark_resolved_for_executed_response_plan(
+                response_plan_idx
             )
             return
 
@@ -107,12 +113,17 @@ class ResponsePlanActionExecutor:
                 result,
             )
 
-        self.response_plan_service.update_status(
-            response_plan_idx,
+        final_status = (
             ResponsePlanStatus.FAILED.value
             if failed
-            else ResponsePlanStatus.EXECUTED.value,
+            else ResponsePlanStatus.EXECUTED.value
         )
+        self.response_plan_service.update_status(response_plan_idx, final_status)
+
+        if final_status == ResponsePlanStatus.EXECUTED.value:
+            self.incident_service.mark_resolved_for_executed_response_plan(
+                response_plan_idx
+            )
 
     def _find_action_tool(
         self, tools: list[BaseTool], tool_name: str
