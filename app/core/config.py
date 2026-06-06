@@ -22,11 +22,10 @@ class Settings(BaseSettings):
     # Elasticsearch MCP log search settings
     ELASTICSEARCH_MCP_ENABLED: bool = Field(default=False)
     ELASTICSEARCH_MCP_URL: str = Field(default="http://localhost:8085/mcp")
-    ELASTICSEARCH_MCP_ALLOWED_INDEX_PATTERN: str = Field(default="logstash-*")
-    ELASTICSEARCH_MCP_SERVICE_FIELD: str = Field(default="fields.service")
+    ELASTICSEARCH_MCP_ALLOWED_INDEX_PATTERN: str = Field(default=".ds-logs-generic-default-*")
     ELASTICSEARCH_MCP_SERVICE_VALUE: str = Field(default="dvwa-apache")
     ELASTICSEARCH_MCP_MAX_RESULTS: int = Field(default=20)
-    ELASTICSEARCH_MCP_MAX_WINDOW_MINUTES: int = Field(default=30)
+    ELASTICSEARCH_MCP_LOOKBACK_MINUTES: int = Field(default=10)
     ELASTICSEARCH_MCP_REQUEST_TIMEOUT_SECONDS: int = Field(default=10)
 
     # Victim MCP settings for response-plan enrichment and future execution.
