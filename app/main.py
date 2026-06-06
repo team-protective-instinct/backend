@@ -53,6 +53,7 @@ def create_app() -> FastAPI:
         allow_origins=[
             "http://localhost:8081",
             "http://127.0.0.1:8081",
+            "https://frontend-sejong-capstone.vercel.app",
         ],
         allow_credentials=True,
         allow_methods=["*"],
