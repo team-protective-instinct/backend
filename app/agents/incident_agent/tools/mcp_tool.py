@@ -19,21 +19,11 @@ def build_search_wrapper(
     search_tool: BaseTool,
 ) -> BaseTool:
     async def search_recent_security_logs(
-        source_ip: str | None = None,
-        uri: str | None = None,
-        rule_id: str | None = None,
-        keyword: str | None = None,
-        minutes: int = 10,
         max_results: int = 10,
     ) -> str:
         return await search_recent_security_logs_impl(
             settings=settings,
             search_tool=search_tool,
-            source_ip=source_ip,
-            uri=uri,
-            rule_id=rule_id,
-            keyword=keyword,
-            minutes=minutes,
             max_results=max_results,
         )
 
@@ -42,7 +32,7 @@ def build_search_wrapper(
         name="elasticsearch_search_recent_security_logs",
         description=(
             "Search recent Elasticsearch security logs through MCP using a constrained "
-            "time window and filters. Use this to enrich an alert with nearby evidence."
+            "time window. Use this to enrich an alert with nearby evidence."
         ),
         args_schema=ElasticsearchSearchInput,
     )
@@ -51,24 +41,15 @@ def build_search_wrapper(
 async def search_recent_security_logs_impl(
     settings: Settings,
     search_tool: BaseTool,
-    source_ip: str | None = None,
-    uri: str | None = None,
-    rule_id: str | None = None,
-    keyword: str | None = None,
-    minutes: int = 10,
     max_results: int = 10,
 ) -> str:
     if search_tool is None:
         return "Elasticsearch MCP log search unavailable: search tool was not initialized."
 
-    bounded_minutes = min(max(minutes, 1), settings.ELASTICSEARCH_MCP_MAX_WINDOW_MINUTES)
+    bounded_minutes = max(settings.ELASTICSEARCH_MCP_LOOKBACK_MINUTES, 1)
     bounded_results = min(max(max_results, 1), settings.ELASTICSEARCH_MCP_MAX_RESULTS)
     query_body = build_query_body(
         settings=settings,
-        source_ip=source_ip,
-        uri=uri,
-        rule_id=rule_id,
-        keyword=keyword,
         minutes=bounded_minutes,
         max_results=bounded_results,
     )
@@ -90,14 +71,10 @@ async def search_recent_security_logs_impl(
 
 def build_query_body(
     settings: Settings,
-    source_ip: str | None,
-    uri: str | None,
-    rule_id: str | None,
-    keyword: str | None,
     minutes: int,
     max_results: int,
 ) -> dict[str, object]:
-    bounded_minutes = min(max(minutes, 1), settings.ELASTICSEARCH_MCP_MAX_WINDOW_MINUTES)
+    bounded_minutes = max(minutes, 1)
     bounded_results = min(max(max_results, 1), settings.ELASTICSEARCH_MCP_MAX_RESULTS)
     filters: list[dict[str, object]] = [
         {
@@ -112,33 +89,6 @@ def build_query_body(
     service_filter = build_service_filter(settings)
     if service_filter is not None:
         filters.append(service_filter)
-
-    should: list[dict[str, object]] = []
-    for value, fields in (
-        (source_ip, ["source_ip", "client.ip", "source.ip", "host.ip", "message"]),
-        (uri, ["uri", "url.path", "url.original", "request", "message"]),
-        (rule_id, ["rule_id", "rule.id", "modsec.rule_id", "message"]),
-        (keyword, ["rule_message", "message", "body", "user_agent"]),
-    ):
-        cleaned = clean_filter_value(value)
-        if cleaned:
-            should.append(
-                {
-                    "multi_match": {
-                        "query": cleaned,
-                        "fields": fields,
-                        "type": "phrase",
-                    }
-                }
-            )
-
-    query: dict[str, object] = {"bool": {"filter": filters}}
-    if should:
-        query["bool"] = {
-            "filter": filters,
-            "should": should,
-            "minimum_should_match": 1,
-        }
 
     return {
         "size": bounded_results,
@@ -164,7 +114,7 @@ def build_query_body(
             "body",
             "user_agent",
         ],
-        "query": query,
+        "query": {"bool": {"filter": filters}},
     }
 
 
@@ -194,20 +144,19 @@ def build_search_payload(
 
 
 def build_service_filter(settings: Settings) -> dict[str, object] | None:
-    field = settings.ELASTICSEARCH_MCP_SERVICE_FIELD.strip()
     value = settings.ELASTICSEARCH_MCP_SERVICE_VALUE.strip()
-    if not field or not value:
+    if not value:
         return None
-    return {"match_phrase": {field: value}}
-
-
-def clean_filter_value(value: str | None) -> str | None:
-    if value is None:
-        return None
-    cleaned = value.strip()
-    if not cleaned or cleaned in {"*", "?"}:
-        return None
-    return cleaned[:200]
+    return {
+        "bool": {
+            "should": [
+                {"match_phrase": {"fields.service": value}},
+                {"match_phrase": {"service.name": value}},
+                {"match_phrase": {"service": value}},
+            ],
+            "minimum_should_match": 1,
+        }
+    }
 
 
 async def invoke_tool(tool: BaseTool, payload: dict[str, object]) -> object:
@@ -259,19 +208,40 @@ def extract_hits(value: object) -> list[object]:
                 return nested_hits
         if isinstance(hits, list):
             return hits
+        text_hits = extract_json_text_hits(value.get("text"))
+        if text_hits:
+            return text_hits
         for key in ("result", "content"):
             nested = value.get(key)
             extracted = extract_hits(nested)
             if extracted:
                 return extracted
     if isinstance(value, list):
-        if all(isinstance(item, dict) and "_source" in item for item in value):
+        if all(is_compact_source_hit(item) for item in value):
             return value
         for item in value:
             extracted = extract_hits(item)
             if extracted:
                 return extracted
     return []
+
+
+def extract_json_text_hits(value: object) -> list[object]:
+    if isinstance(value, list | dict):
+        return extract_hits(value)
+    if not isinstance(value, str):
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return extract_hits(parsed)
+
+
+def is_compact_source_hit(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return any(key in value for key in ("_source", "@timestamp", "message"))
 
 
 def compact_hit(hit: object) -> dict[str, object]:
