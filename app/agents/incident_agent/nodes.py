@@ -2,6 +2,7 @@ from typing import cast
 from collections.abc import Sequence
 from langchain_core.messages import (
     AIMessage,
+    BaseMessage,
     HumanMessage,
     SystemMessage,
     merge_message_runs,
@@ -17,6 +18,9 @@ from .prompt import (
 from .state import AgentState
 from app.core.llm import get_llm
 from app.schemas.agent_schema import AnalysisReport
+
+
+AGENT_CONTEXT_PREFIX = "Incident agent context (trusted metadata):\n"
 
 
 def _get_llm_resources(tools: Sequence[BaseTool]):
@@ -37,11 +41,30 @@ async def reason_and_act(state: AgentState, tools: Sequence[BaseTool]):
     """
     collector = _get_llm_resources(tools)["llm_with_tools"]
     system_prompt = SystemMessage(content=THREAT_ANALYSIS_AGENT_SYSTEM_PROMPT)
+    context_message = _build_context_message(state.get("context"))
 
-    messages = merge_message_runs([system_prompt] + state["messages"])
+    base_messages: list[BaseMessage] = [system_prompt]
+    if context_message is not None:
+        base_messages.append(context_message)
+    messages = merge_message_runs(base_messages + state["messages"])
 
     response = await collector.ainvoke(messages)
     return {"messages": [response]}
+
+
+def _build_context_message(context: dict[str, object] | None) -> HumanMessage | None:
+    if not context:
+        return None
+    lines = [AGENT_CONTEXT_PREFIX]
+    alert_timestamp = context.get("alert_timestamp")
+    if isinstance(alert_timestamp, str) and alert_timestamp.strip():
+        lines.append(f"alert_timestamp: {alert_timestamp.strip()}")
+    source = context.get("source")
+    if isinstance(source, str) and source.strip():
+        lines.append(f"source: {source.strip()}")
+    if len(lines) == 1:
+        return None
+    return HumanMessage(content="\n".join(lines))
 
 
 async def generate_final_report(state: AgentState, tools: Sequence[BaseTool]):

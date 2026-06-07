@@ -116,7 +116,7 @@ class WebhookAlertRequest(BaseModel):
         default=None,
         max_length=12000,
         description="ElastAlert가 전송한 원본 로그 메시지",
-        examples=["GET /dvwa/vulnerabilities/sqli/?id=1%27+UNION+SELECT..."],
+        examples=["GET /vulnerabilities/sqli/?id=1%27+UNION+SELECT..."],
     )
 
     alert_name: str = Field(
@@ -142,7 +142,7 @@ class WebhookAlertRequest(BaseModel):
                     "title": "SQL Injection 공격 탐지",
                     "rule_name": "SQLi Webhook Rule",
                     "timestamp": "2026-05-06T12:00:00Z",
-                    "log_message": "GET /dvwa/vulnerabilities/sqli/?id=1%27+UNION+SELECT...",
+                    "log_message": "GET /vulnerabilities/sqli/?id=1%27+UNION+SELECT...",
                 },
                 {
                     "alert_name": "sql_injection_detected",
