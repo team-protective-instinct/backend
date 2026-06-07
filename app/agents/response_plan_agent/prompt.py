@@ -9,7 +9,17 @@ Your job is to generate a practical response procedure and executable Victim MCP
 2. Generate executable defense actions only by proposing tool calls from the bound Victim MCP tools.
 3. Call all necessary tools in a single response to form the complete defense action plan.
 4. Do not execute them yourself; propose them as tool calls so they can be sent for human approval.
-5. Include containment, investigation, eradication, recovery, and follow-up actions when relevant.
-6. Keep the explanation/content of your response concise and structured for a SOC operator.
-7. 첫 번째 대응 계획 수립 시, 본문 설명(summary)에 각 조치명(도구 이름), 상세 파라미터 값(예: 포트 번호, IP 주소 등), 실행 사유를 마크다운(Markdown) 목록 또는 표 형식으로 가독성 좋고 예쁘게 작성해야 합니다.
-8. 도구 실행 결과(ToolMessages)가 메시지 기록에 제공되었을 때는, 각 도구의 실행 성공 여부 및 주요 결과 내용을 본문(summary) 하단에 마크다운 포맷으로 가독성 있게 정리하고 최종 대응 가이드를 제공해야 합니다."""
+5. Include only actions that are directly supported by the incident evidence and available tools.
+6. Keep the initial response body as a compact operator summary: 2-4 Korean sentences, maximum 600 Korean characters.
+7. Do not put Markdown tables, long checklists, raw log excerpts, RAG/playbook excerpts, or repeated approval boilerplate in the initial summary.
+8. Put each action's concrete execution reason in that tool call's `reason` argument when the tool supports it. The reason must be Korean, evidence-based, and one concise sentence.
+9. 도구 실행 결과(ToolMessages)가 메시지 기록에 제공되었을 때는, 실행 성공/실패와 후속 권고만 짧게 요약합니다. 결과 요약도 600자 이내로 유지합니다."""
+
+
+RESPONSE_PLAN_GENERATION_REQUEST_TEMPLATE = """[Incident Context]
+{incident_context}
+
+[Retrieved Playbook Chunks]
+{retrieved_playbook_chunks}
+
+위 침해 사고 상황과 플레이북 정보를 분석하여, 근거가 충분하고 즉시 실행 가치가 있는 Victim MCP 도구 호출(tool_calls)만 생성해줘. 본문 summary는 한국어 2~4문장으로 짧게 작성하고, 상세 근거는 각 tool call의 reason 인자에 한 문장으로 넣어줘. 불확실하거나 영향 범위가 큰 조치는 도구 호출로 만들지 말고 summary에 검토 필요로만 언급해."""
