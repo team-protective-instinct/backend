@@ -162,6 +162,7 @@ def build_service_filter(settings: Settings) -> dict[str, object] | None:
                 {"match_phrase": {"fields.service": value}},
                 {"match_phrase": {"service.name": value}},
                 {"match_phrase": {"service": value}},
+                {"match_phrase": {"fields.services.keyword": value}},
             ],
             "minimum_should_match": 1,
         }
