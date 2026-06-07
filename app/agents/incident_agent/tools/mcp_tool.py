@@ -28,6 +28,10 @@ def build_search_wrapper(
         )
         query_body = build_query_body(settings, bounded_results)
         payload = build_search_payload(settings, search_tool, query_body)
+        logger.info(
+            "Elasticsearch MCP request payload: %s",
+            json.dumps(payload, ensure_ascii=False, default=str),
+        )
 
         try:
             result = await asyncio.wait_for(
