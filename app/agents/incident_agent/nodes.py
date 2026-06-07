@@ -56,9 +56,6 @@ def _build_context_message(context: dict[str, object] | None) -> HumanMessage | 
     if not context:
         return None
     lines = [AGENT_CONTEXT_PREFIX]
-    alert_timestamp = context.get("alert_timestamp")
-    if isinstance(alert_timestamp, str) and alert_timestamp.strip():
-        lines.append(f"alert_timestamp: {alert_timestamp.strip()}")
     source = context.get("source")
     if isinstance(source, str) and source.strip():
         lines.append(f"source: {source.strip()}")

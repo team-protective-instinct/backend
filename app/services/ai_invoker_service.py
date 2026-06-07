@@ -7,7 +7,6 @@ from typing import cast
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.incident_agent.agent import IncidentAgent
-from app.agents.incident_agent.tools.mcp_tool import normalize_alert_timestamp
 from app.agents.incident_agent.prompt import LOG_ANALYSIS_REQUEST_PREFIX
 from app.agents.incident_agent.state import AgentState
 from app.agents.response_plan_agent.agent import ResponsePlanAgent
@@ -61,7 +60,6 @@ class AiInvokerService:
             ],
             "context": {
                 "source": "incident_agent_worker",
-                "alert_timestamp": self._extract_alert_timestamp(raw_payload),
             },
         }
 
@@ -248,25 +246,6 @@ class AiInvokerService:
     def _raw_payload_to_agent_text(self, raw_payload: dict[str, object] | None) -> str:
         payload_text = json.dumps(raw_payload or {}, ensure_ascii=False, indent=2)
         return f"{RAW_LOG_EVIDENCE_PREFIX}{payload_text}{RAW_LOG_EVIDENCE_SUFFIX}"
-
-    def _extract_alert_timestamp(self, raw_payload: dict[str, object] | None) -> str | None:
-        if not raw_payload:
-            return None
-        timestamp = raw_payload.get("timestamp")
-        if isinstance(timestamp, str) and timestamp.strip():
-            return normalize_alert_timestamp(timestamp)
-        logs = raw_payload.get("logs")
-        if not isinstance(logs, list):
-            return None
-        for item in logs:
-            if not isinstance(item, dict):
-                continue
-            log_timestamp = item.get("timestamp")
-            if isinstance(log_timestamp, str) and log_timestamp.strip():
-                normalized = normalize_alert_timestamp(log_timestamp)
-                if normalized is not None:
-                    return normalized
-        return None
 
     def _persist_elasticsearch_mcp_logs(
         self,
