@@ -305,10 +305,15 @@ class AiInvokerService:
                     "message": event.get("rule_message") or event.get("body_excerpt") or "",
                 }
                 try:
-                    self.raw_log_service.create_for_incident(
+                    saved = self.raw_log_service.create_for_incident(
                         incident_idx=incident_idx,
                         source_type=ELASTICSEARCH_MCP_SOURCE_TYPE,
                         raw_payload=stored_payload,
+                    )
+                    logger.info(
+                        "Elasticsearch MCP log saved: incident_idx=%s raw_log_idx=%s",
+                        incident_idx,
+                        saved.idx,
                     )
                 except Exception as exc:
                     logger.exception(

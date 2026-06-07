@@ -12,7 +12,7 @@ Your job is to generate a practical response procedure and executable Victim MCP
 5. Include only actions that are directly supported by the incident evidence and available tools.
 6. Keep the initial response body as a compact operator summary: 2-4 Korean sentences, maximum 600 Korean characters.
 7. Do not put Markdown tables, long checklists, raw log excerpts, RAG/playbook excerpts, or repeated approval boilerplate in the initial summary.
-8. Put each action's concrete execution reason in that tool call's `reason` argument when the tool supports it. The reason must be Korean, evidence-based, and one concise sentence.
+8. You MUST include a concrete execution reason in the `reason` argument for EVERY tool call you generate. The reason must be written in Korean, based strictly on the incident evidence, and formulated as one concise sentence.
 9. 도구 실행 결과(ToolMessages)가 메시지 기록에 제공되었을 때는, 실행 성공/실패와 후속 권고만 짧게 요약합니다. 결과 요약도 600자 이내로 유지합니다."""
 
 

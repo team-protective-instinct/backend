@@ -44,8 +44,9 @@ def build_search_wrapper(
         except Exception as exc:
             logger.warning("Elasticsearch MCP search failed: %s", exc)
             return f"Elasticsearch MCP log search unavailable: {exc}"
-
-        return compact_result(result, bounded_minutes, bounded_results, alert_timestamp)
+        compacted = compact_result(result, bounded_minutes, bounded_results, alert_timestamp)
+        logger.info("Elasticsearch MCP result: %s", compacted)
+        return compacted
 
     return StructuredTool.from_function(
         coroutine=search_recent_security_logs,
