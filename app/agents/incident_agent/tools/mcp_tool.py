@@ -142,10 +142,10 @@ def build_service_filter(settings: Settings) -> dict[str, object] | None:
     return {
         "bool": {
             "should": [
-                {"match_phrase": {"fields.service": value}},
-                {"match_phrase": {"service.name": value}},
-                {"match_phrase": {"service": value}},
-                {"match_phrase": {"fields.services.keyword": value}},
+                {"wildcard": {"fields.service.keyword": value}},
+                {"wildcard": {"service.name.keyword": value}},
+                {"wildcard": {"service.keyword": value}},
+                {"wildcard": {"fields.services.keyword": value}},
             ],
             "minimum_should_match": 1,
         }
